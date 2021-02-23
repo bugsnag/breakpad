@@ -13,6 +13,7 @@ extern "C" {
     const char* filename;
     const char* method;
     const char* frameAddress;
+    const char* loadAddress;
     const char* moduleId;
     const char* moduleName;
 
@@ -21,6 +22,7 @@ extern "C" {
       free((void *)filename);
       free((void *)method);
       free((void *)frameAddress);
+      free((void *)loadAddress);
       free((void *)moduleId);
       free((void *)moduleName);
     }

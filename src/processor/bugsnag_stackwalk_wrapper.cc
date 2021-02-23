@@ -33,26 +33,27 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
   for (int frame_index = 0; frame_index < frame_count; ++frame_index) {
     const StackFrame* frame = stack->frames()->at(frame_index);
 
+    string frameAddress = HexString(frame->instruction);
     string returnAddress;
-    string frameAddress;
+    string loadAddress = "";
     string filename = "";
     string moduleId = "";
     string moduleName = "";
     if (frame->module) {
       returnAddress = HexString(frame->ReturnAddress() - frame->module->base_address());
-      frameAddress = HexString(frame->instruction - frame->module->base_address());
+      loadAddress = HexString(frame->module->base_address());
       filename = frame->module->code_file();
       moduleId = frame->module->debug_identifier();
       moduleName = frame->module->debug_file();
     } else {
       returnAddress = HexString(frame->ReturnAddress());
-      frameAddress = HexString(frame->instruction);
     }
     
     Stackframe f = {
       .filename = strdup(filename.c_str()),
       .method = strdup(returnAddress.c_str()),
       .frameAddress = strdup(frameAddress.c_str()),
+      .loadAddress = strdup(loadAddress.c_str()),
       .moduleId = strdup(moduleId.c_str()),
       .moduleName = strdup(moduleName.c_str())
     };
