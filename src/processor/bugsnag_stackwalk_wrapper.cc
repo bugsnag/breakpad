@@ -24,6 +24,16 @@ using google_breakpad::scoped_ptr;
 using google_breakpad::SimpleSymbolSupplier;
 using google_breakpad::StackFrame;
 
+// Gets the index of the thread that requested a dump be written
+int getErrorReportingThreadIndex(const ProcessState& process_state) {
+  int index = process_state.requesting_thread();
+  // If the dump thread was not available then default to the first available thread
+  if (index == -1) {
+    index = 0;
+  }
+  return index;
+}
+
 // Maps the stacktrace information from a minidump into our Stacktrace struct
 static Stacktrace getStack(int thread_num, const CallStack* stack)  {
   int frame_count = stack->frames()->size();
@@ -91,16 +101,6 @@ Thread* getThreads(const ProcessState& process_state) {
   }
 
   return threads;
-}
-
-// Gets the index of the thread that requested a dump be written
-int getErrorReportingThreadIndex(const ProcessState& process_state) {
-  int index = process_state.requesting_thread();
-  // If the dump thread was not available then default to the first available thread
-  if (index == -1) {
-    index = 0;
-  }
-  return index;
 }
 
 // Maps the information from a minidump into our Event struct
