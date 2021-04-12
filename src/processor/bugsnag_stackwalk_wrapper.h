@@ -66,15 +66,28 @@ extern "C" {
     }
   } Device;
 
+  typedef struct Thread {
+    int id;
+    bool errorReportingThread;
+    Stacktrace stacktrace;
+
+    void destroy() {
+      stacktrace.destroy();
+    }
+  } Thread;
+
   typedef struct Event {
+    int threadCount;
     const char* temp;
     Exception exception;
     App app;
     Device device;
+    Thread* threads;
 
     void destroy() {
       app.destroy();
       device.destroy();
+      free(threads);
     }
   } Event;
 

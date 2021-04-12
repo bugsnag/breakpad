@@ -73,9 +73,39 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
   return s;
 }
 
+Thread* getThreads(const ProcessState& process_state) {
+  int thread_count = process_state.threads()->size();
+  int error_reporting_thread_index = getErrorReportingThreadIndex(process_state);
+
+  Thread* threads = new Thread[thread_count];
+
+  for (int i = 0; i < thread_count; i++) {
+      const CallStack* thread = process_state.threads()->at(i);
+      int thread_id = thread->tid();
+      Thread t = {
+        .id = thread_id,
+        .stacktrace = getStack(i, thread),
+        .errorReportingThread = (i == error_reporting_thread_index)
+      };
+      threads[i] = t;
+  }
+
+  return threads;
+}
+
+// Gets the index of the thread that requested a dump be written
+int getErrorReportingThreadIndex(const ProcessState& process_state) {
+  int index = process_state.requesting_thread();
+  // If the dump thread was not available then default to the first available thread
+  if (index == -1) {
+    index = 0;
+  }
+  return index;
+}
+
 // Maps the information from a minidump into our Event struct
 Event getEvent(const ProcessState& process_state) {
-  Stacktrace s = getStack(1, process_state.threads()->at(0));
+  Stacktrace s = getStack(1, process_state.threads()->at(getErrorReportingThreadIndex(process_state)));
 
   Exception e = {
     .stacktrace = s,
@@ -98,13 +128,14 @@ Event getEvent(const ProcessState& process_state) {
     .osName = strdup(process_state.system_info()->os.data()),
     .osVersion = strdup(process_state.system_info()->os_version.c_str()) // TODO split build from version (but we may want to do that in the service)
   };
-
-  // TODO - Parse and add threads
-
+  
+  int thread_count = process_state.threads()->size();
   Event returnEvent = {
     .exception = e,
     .app = app,
-    .device = device
+    .device = device,
+    .threads = getThreads(process_state),
+    .threadCount = thread_count
   };
 
   return returnEvent;
