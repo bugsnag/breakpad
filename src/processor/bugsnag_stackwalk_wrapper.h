@@ -40,9 +40,11 @@ extern "C" {
   typedef struct Exception {
     Stacktrace stacktrace;
     const char* errorClass;
+    const char* crashAddress;
 
     void destroy() {
       free((void *)errorClass);
+      free((void *)crashAddress);
       stacktrace.destroy();
     }
   } Exception;

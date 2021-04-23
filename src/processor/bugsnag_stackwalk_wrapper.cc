@@ -111,6 +111,10 @@ Event getEvent(const ProcessState& process_state) {
     .stacktrace = s,
     .errorClass = strdup(process_state.crash_reason().c_str())
   };
+  string crashAddress = HexString(process_state.crash_address());
+  if (crashAddress != "") {
+    e.crashAddress = strdup(crashAddress.c_str());
+  }
 
   int uptime = 0;
   if (process_state.time_date_stamp() != 0 &&
@@ -126,7 +130,7 @@ Event getEvent(const ProcessState& process_state) {
 
   Device device = {
     .osName = strdup(process_state.system_info()->os.data()),
-    .osVersion = strdup(process_state.system_info()->os_version.c_str()) // TODO split build from version (but we may want to do that in the service)
+    .osVersion = strdup(process_state.system_info()->os_version.c_str())
   };
   
   int thread_count = process_state.threads()->size();
