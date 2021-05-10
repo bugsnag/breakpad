@@ -146,38 +146,39 @@ Event getEvent(const ProcessState& process_state) {
 }
 
 // Get the details of the modules in a minidump
-ModuleDetails GetModuleDetails(const char* minidump_filename) {
+WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
+  WrappedModuleDetails result = {{0}};
+
   Minidump dump(minidump_filename);
   if (!dump.Read()) {
-    // TODO improve error handling
-    fprintf(stderr, "Minidump could not be read\n");
+    result.pstrErr = strdup("failed to read minidump");
+    return result;
   }
-
-  ModuleDetails module_details = {
-    .moduleCount = 0
-  };
 
   MinidumpModuleList* module_list = dump.GetModuleList();
-  if (module_list) {
-    module_details.moduleCount = module_list->module_count();
-
-    char **module_ids = (char**)malloc(sizeof(char*) * module_list->module_count());
-    char **module_names = (char**)malloc(sizeof(char*) * module_list->module_count());
-
-    for (unsigned int i = 0; i < module_list->module_count(); i++) {
-      const MinidumpModule* module = module_list->GetModuleAtIndex(i);
-
-      module_ids[i] = (char*)malloc(sizeof(char) * strlen(module->debug_identifier().c_str()));
-      strcpy(module_ids[i], module->debug_identifier().c_str());
-      module_details.moduleIds = module_ids;
-
-      module_names[i] = (char*)malloc(sizeof(char) * strlen(module->debug_file().c_str()));
-      strcpy(module_names[i], module->debug_file().c_str());
-      module_details.moduleNames = module_names;
-    }
+  if (!module_list) {
+    result.pstrErr = strdup("failed to get module list");
+    return result;
   }
 
-  return module_details;
+  result.moduleDetails.moduleCount = module_list->module_count();
+
+  char **module_ids = (char**)malloc(sizeof(char*) * module_list->module_count());
+  char **module_names = (char**)malloc(sizeof(char*) * module_list->module_count());
+
+  for (unsigned int i = 0; i < module_list->module_count(); i++) {
+    const MinidumpModule* module = module_list->GetModuleAtIndex(i);
+
+    module_ids[i] = (char*)malloc(sizeof(char) * strlen(module->debug_identifier().c_str()));
+    strcpy(module_ids[i], module->debug_identifier().c_str());
+    result.moduleDetails.moduleIds = module_ids;
+
+    module_names[i] = (char*)malloc(sizeof(char) * strlen(module->debug_file().c_str()));
+    strcpy(module_names[i], module->debug_file().c_str());
+    result.moduleDetails.moduleNames = module_names;
+  };
+
+  return result;
 }
 
 // Gets an Event payload from the minidump.

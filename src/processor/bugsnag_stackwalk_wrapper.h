@@ -108,7 +108,16 @@ extern "C" {
     }
   } ModuleDetails;
 
-  ModuleDetails GetModuleDetails(const char* minidump_filename);
+  typedef struct WrappedModuleDetails {
+    ModuleDetails moduleDetails;
+    const char *pstrErr;
+
+    void destroy() {
+      moduleDetails.destroy();
+    }
+  } WrappedModuleDetails;
+
+  WrappedModuleDetails GetModuleDetails(const char* minidump_filename);
   Event GetEventFromMinidump(const char* filename, const char* symbol_path);
   void FreeEvent(Event* event);
   void FreeModuleDetails(ModuleDetails* module_details);
