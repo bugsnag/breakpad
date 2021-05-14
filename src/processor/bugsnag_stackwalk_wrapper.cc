@@ -149,34 +149,41 @@ Event getEvent(const ProcessState& process_state) {
 WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
   WrappedModuleDetails result = {{0}};
 
-  Minidump dump(minidump_filename);
-  if (!dump.Read()) {
-    result.pstrErr = strdup("failed to read minidump");
-    return result;
+  try {
+    Minidump dump(minidump_filename);
+    if (!dump.Read()) {
+      result.pstrErr = strdup("failed to read minidump");
+      return result;
+    }
+
+    MinidumpModuleList* module_list = dump.GetModuleList();
+    if (!module_list) {
+      result.pstrErr = strdup("failed to get module list");
+      return result;
+    }
+
+    result.moduleDetails.moduleCount = module_list->module_count();
+
+    char **module_ids = (char**)malloc(sizeof(char*) * module_list->module_count());
+    char **module_names = (char**)malloc(sizeof(char*) * module_list->module_count());
+
+    for (unsigned int i = 0; i < module_list->module_count(); i++) {
+      const MinidumpModule* module = module_list->GetModuleAtIndex(i);
+
+      module_ids[i] = (char*)malloc(sizeof(char) * strlen(module->debug_identifier().c_str()));
+      strcpy(module_ids[i], module->debug_identifier().c_str());
+      result.moduleDetails.moduleIds = module_ids;
+
+      module_names[i] = (char*)malloc(sizeof(char) * strlen(module->debug_file().c_str()));
+      strcpy(module_names[i], module->debug_file().c_str());
+      result.moduleDetails.moduleNames = module_names;
+    };
+  } catch(const std::exception& ex) {
+    string errMsg = "encountered exception : " + string(ex.what());
+    result.pstrErr = strdup(errMsg.c_str());
+  } catch(...) {
+    result.pstrErr = strdup("encountered unknown exception");
   }
-
-  MinidumpModuleList* module_list = dump.GetModuleList();
-  if (!module_list) {
-    result.pstrErr = strdup("failed to get module list");
-    return result;
-  }
-
-  result.moduleDetails.moduleCount = module_list->module_count();
-
-  char **module_ids = (char**)malloc(sizeof(char*) * module_list->module_count());
-  char **module_names = (char**)malloc(sizeof(char*) * module_list->module_count());
-
-  for (unsigned int i = 0; i < module_list->module_count(); i++) {
-    const MinidumpModule* module = module_list->GetModuleAtIndex(i);
-
-    module_ids[i] = (char*)malloc(sizeof(char) * strlen(module->debug_identifier().c_str()));
-    strcpy(module_ids[i], module->debug_identifier().c_str());
-    result.moduleDetails.moduleIds = module_ids;
-
-    module_names[i] = (char*)malloc(sizeof(char) * strlen(module->debug_file().c_str()));
-    strcpy(module_names[i], module->debug_file().c_str());
-    result.moduleDetails.moduleNames = module_names;
-  };
 
   return result;
 }
@@ -226,6 +233,6 @@ void FreeEvent(Event* event) {
 
 // Frees the memory allocated by the module details
 // TODO - Check there are no memory leaks
-void FreeModuleDetails(ModuleDetails* module_details) {
-  module_details->destroy();
+void FreeModuleDetails(WrappedModuleDetails* wrapped_module_details) {
+  wrapped_module_details->destroy();
 }

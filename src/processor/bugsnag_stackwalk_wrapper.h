@@ -113,6 +113,7 @@ extern "C" {
     const char *pstrErr;
 
     void destroy() {
+      free((void *)pstrErr);
       moduleDetails.destroy();
     }
   } WrappedModuleDetails;
@@ -120,7 +121,7 @@ extern "C" {
   WrappedModuleDetails GetModuleDetails(const char* minidump_filename);
   Event GetEventFromMinidump(const char* filename, const char* symbol_path);
   void FreeEvent(Event* event);
-  void FreeModuleDetails(ModuleDetails* module_details);
+  void FreeModuleDetails(WrappedModuleDetails* wrapped_module_details);
 
 #ifdef __cplusplus
 }
