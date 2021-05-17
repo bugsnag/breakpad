@@ -93,6 +93,16 @@ extern "C" {
     }
   } Event;
 
+  typedef struct WrappedEvent {
+    Event event;
+    const char *pstrErr;
+
+    void destroy() {
+      free((void *)pstrErr);
+      event.destroy();
+    }
+  } WrappedEvent;
+
   typedef struct ModuleDetails {
     int moduleCount;
     char** moduleIds;
@@ -119,8 +129,8 @@ extern "C" {
   } WrappedModuleDetails;
 
   WrappedModuleDetails GetModuleDetails(const char* minidump_filename);
-  Event GetEventFromMinidump(const char* filename, const char* symbol_path);
-  void FreeEvent(Event* event);
+  WrappedEvent GetEventFromMinidump(const char* filename, const char* symbol_path);
+  void FreeEvent(WrappedEvent* wrapped_event);
   void FreeModuleDetails(WrappedModuleDetails* wrapped_module_details);
 
 #ifdef __cplusplus

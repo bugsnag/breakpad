@@ -19,6 +19,7 @@ using google_breakpad::MinidumpModule;
 using google_breakpad::MinidumpModuleList;
 using google_breakpad::MinidumpProcessor;
 using google_breakpad::MinidumpThreadList;
+using google_breakpad::ProcessResult;
 using google_breakpad::ProcessState;
 using google_breakpad::scoped_ptr;
 using google_breakpad::SimpleSymbolSupplier;
@@ -179,7 +180,7 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
       result.moduleDetails.moduleNames = module_names;
     };
   } catch(const std::exception& ex) {
-    string errMsg = "encountered exception : " + string(ex.what());
+    string errMsg = "encountered exception: " + string(ex.what());
     result.pstrErr = strdup(errMsg.c_str());
   } catch(...) {
     result.pstrErr = strdup("encountered unknown exception");
@@ -188,47 +189,90 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
   return result;
 }
 
+// Gets a friendly version of a minidump processing failure reason
+string getFriendlyFailureReason(ProcessResult process_result) {
+  string reason = "";
+
+  switch(process_result) {
+    case google_breakpad::PROCESS_ERROR_MINIDUMP_NOT_FOUND:
+      reason = "minidump not found";
+      break;
+    case google_breakpad::PROCESS_ERROR_NO_MINIDUMP_HEADER:
+      reason = "no minidump header";
+      break;
+    case google_breakpad::PROCESS_ERROR_NO_THREAD_LIST:
+      reason = "no thread list";
+      break;
+    case google_breakpad::PROCESS_ERROR_GETTING_THREAD:
+      reason = "error getting thread";
+      break;
+    case google_breakpad::PROCESS_ERROR_GETTING_THREAD_ID:
+      reason = "error getting thread ID";
+      break;
+    case google_breakpad::PROCESS_ERROR_DUPLICATE_REQUESTING_THREADS:
+      reason = "more than one requesting thread";
+      break;
+    case google_breakpad::PROCESS_SYMBOL_SUPPLIER_INTERRUPTED:
+      reason = "dump processing interrupted by symbol supplier";
+      break;
+    default:
+      reason = "unknown failure reason";
+  }
+
+  return reason;
+}
+
 // Gets an Event payload from the minidump.
 // Note: Logic for parsing the minidump is based on PrintMinidumpProcess in minidump_stackwalk.cc
 // TODO - See if we can disable the logging output
-Event GetEventFromMinidump(const char* filename, const char* symbol_path) {
+WrappedEvent GetEventFromMinidump(const char* filename, const char* symbol_path) {
+  WrappedEvent result = {{0}};
 
-  // Apply a symbol supplier if we've been given a symbol path (to allow the stack data to be used when walking the stacktrace)
-  scoped_ptr<SimpleSymbolSupplier> symbol_supplier;
-  if (symbol_path != NULL && strlen(symbol_path) > 0) {
-    symbol_supplier.reset(new SimpleSymbolSupplier(symbol_path));
+  try {
+    // Apply a symbol supplier if we've been given a symbol path (to allow the stack data to be used when walking the stacktrace)
+    scoped_ptr<SimpleSymbolSupplier> symbol_supplier;
+    if (symbol_path != NULL && strlen(symbol_path) > 0) {
+      symbol_supplier.reset(new SimpleSymbolSupplier(symbol_path));
+    }
+
+    BasicSourceLineResolver resolver;
+    MinidumpProcessor minidump_processor(symbol_supplier.get(), &resolver);
+
+    // Increase the maximum number of threads and regions.
+    MinidumpThreadList::set_max_threads(std::numeric_limits<uint32_t>::max());
+    MinidumpMemoryList::set_max_regions(std::numeric_limits<uint32_t>::max());
+    
+    // Process the minidump.
+    Minidump dump(filename);
+    if (!dump.Read()) {
+      result.pstrErr = strdup("failed to read minidump");
+      return result;
+    }
+
+    ProcessState process_state;
+    ProcessResult process_result = minidump_processor.Process(&dump, &process_state);
+    if (process_result != google_breakpad::PROCESS_OK) {
+      string errMsg = "failed to process minidump: " + getFriendlyFailureReason(process_result);
+      result.pstrErr = strdup(errMsg.c_str());
+      return result;
+    }
+
+    // Map the process state to an Event struct
+    result.event = getEvent(process_state);
+  } catch(const std::exception& ex) {
+    string errMsg = "encountered exception: " + string(ex.what());
+    result.pstrErr = strdup(errMsg.c_str());
+  } catch(...) {
+    result.pstrErr = strdup("encountered unknown exception");
   }
 
-  BasicSourceLineResolver resolver;
-  MinidumpProcessor minidump_processor(symbol_supplier.get(), &resolver);
-
-  // Increase the maximum number of threads and regions.
-  MinidumpThreadList::set_max_threads(std::numeric_limits<uint32_t>::max());
-  MinidumpMemoryList::set_max_regions(std::numeric_limits<uint32_t>::max());
-  
-  // Process the minidump.
-  Minidump dump(filename);
-  if (!dump.Read()) {
-    // TODO improve error handling
-    fprintf(stderr, "Minidump could not be read\n");
-  }
-
-  ProcessState process_state;
-  if (minidump_processor.Process(&dump, &process_state) != google_breakpad::PROCESS_OK) {
-      // TODO improve error handling
-      fprintf(stderr, "MinidumpProcessor::Process failed\n");
-  }
-
-  // Map the process state to an Event struct
-  Event returnEvent = getEvent(process_state);
-
-  return returnEvent;
+  return result;
 }
 
 // Frees the memory allocated by an Event
 // TODO - Check there are no memory leaks
-void FreeEvent(Event* event) {
-  event->destroy();
+void FreeEvent(WrappedEvent* wrapped_event) {
+  wrapped_event->destroy();
 }
 
 // Frees the memory allocated by the module details
