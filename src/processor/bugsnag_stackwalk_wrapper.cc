@@ -227,7 +227,6 @@ string getFriendlyFailureReason(ProcessResult process_result) {
 
 // Gets an Event payload from the minidump.
 // Note: Logic for parsing the minidump is based on PrintMinidumpProcess in minidump_stackwalk.cc
-// TODO - See if we can disable the logging output
 WrappedEvent GetEventFromMinidump(const char* filename, const char* symbol_path) {
   WrappedEvent result = {{0}};
 
