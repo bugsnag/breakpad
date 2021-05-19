@@ -4,6 +4,9 @@
 #include "logging.h"
 #include "simple_symbol_supplier.h"
 
+#include <stdexcept>
+#include <limits>
+
 #include "google_breakpad/processor/basic_source_line_resolver.h"
 #include "google_breakpad/processor/minidump_processor.h"
 #include "google_breakpad/processor/process_state.h"
@@ -95,8 +98,8 @@ Thread* getThreads(const ProcessState& process_state) {
       int thread_id = thread->tid();
       Thread t = {
         .id = thread_id,
-        .stacktrace = getStack(i, thread),
-        .errorReportingThread = (i == error_reporting_thread_index)
+        .errorReportingThread = (i == error_reporting_thread_index),
+        .stacktrace = getStack(i, thread)
       };
       threads[i] = t;
   }
@@ -125,8 +128,8 @@ Event getEvent(const ProcessState& process_state) {
   }
 
   App app = {
-    .binaryArch = strdup(process_state.system_info()->cpu.c_str()),
-    .duration = uptime // TODO - Handle this being empty
+    .duration = uptime, // TODO - Handle this being empty
+    .binaryArch = strdup(process_state.system_info()->cpu.c_str())
   };
 
   Device device = {
@@ -136,11 +139,11 @@ Event getEvent(const ProcessState& process_state) {
   
   int thread_count = process_state.threads()->size();
   Event returnEvent = {
+    .threadCount = thread_count,
     .exception = e,
     .app = app,
     .device = device,
-    .threads = getThreads(process_state),
-    .threadCount = thread_count
+    .threads = getThreads(process_state)
   };
 
   return returnEvent;
