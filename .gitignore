@@ -91,3 +91,6 @@ src/tools/gyp
 
 # Ignore build directory
 build
+
+# Ignore tmp directory used during building
+tmp
