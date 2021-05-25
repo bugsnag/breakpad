@@ -174,14 +174,16 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
     for (unsigned int i = 0; i < module_list->module_count(); i++) {
       const MinidumpModule* module = module_list->GetModuleAtIndex(i);
 
-      module_ids[i] = (char*)malloc(sizeof(char) * strlen(module->debug_identifier().c_str()));
-      strcpy(module_ids[i], module->debug_identifier().c_str());
-      result.moduleDetails.moduleIds = module_ids;
+      string debug_identifier = module->debug_identifier();
+      module_ids[i] = (char*)malloc(sizeof(char) * strlen(debug_identifier.c_str()));
+      module_ids[i] = strdup(debug_identifier.c_str());
 
-      module_names[i] = (char*)malloc(sizeof(char) * strlen(module->debug_file().c_str()));
-      strcpy(module_names[i], module->debug_file().c_str());
-      result.moduleDetails.moduleNames = module_names;
+      string debug_file = module->debug_file();
+      module_names[i] = (char*)malloc(sizeof(char) * strlen(debug_file.c_str()));
+      module_names[i] = strdup(debug_file.c_str());
     };
+    result.moduleDetails.moduleIds = module_ids;
+    result.moduleDetails.moduleNames = module_names;
   } catch(const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
     result.pstrErr = strdup(errMsg.c_str());
