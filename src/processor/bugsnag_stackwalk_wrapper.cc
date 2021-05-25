@@ -175,11 +175,9 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
       const MinidumpModule* module = module_list->GetModuleAtIndex(i);
 
       string debug_identifier = module->debug_identifier();
-      module_ids[i] = (char*)malloc(sizeof(char) * strlen(debug_identifier.c_str()));
       module_ids[i] = strdup(debug_identifier.c_str());
 
       string debug_file = module->debug_file();
-      module_names[i] = (char*)malloc(sizeof(char) * strlen(debug_file.c_str()));
       module_names[i] = strdup(debug_file.c_str());
     };
     result.moduleDetails.moduleIds = module_ids;
