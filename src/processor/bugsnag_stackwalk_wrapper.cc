@@ -38,6 +38,38 @@ int getErrorReportingThreadIndex(const ProcessState& process_state) {
   return index;
 }
 
+// strips the `FRAME_TRUST_` from the trust enum
+string getTrustWithoutPrefix(StackFrame::FrameTrust stackFrameTrust)  {
+  string trust = "";
+  switch(stackFrameTrust) {
+    case StackFrame::FRAME_TRUST_NONE:
+      trust = "NONE";
+      break;
+    case StackFrame::FRAME_TRUST_SCAN:
+      trust = "SCAN";
+      break;
+    case StackFrame::FRAME_TRUST_CFI_SCAN:
+      trust = "CFI_SCAN";
+      break;
+    case StackFrame::FRAME_TRUST_FP:
+      trust = "FP";
+      break;
+    case StackFrame::FRAME_TRUST_CFI:
+      trust = "CFI";
+      break;
+    case StackFrame::FRAME_TRUST_PREWALKED:
+      trust = "PREWALKED";
+      break;
+    case StackFrame::FRAME_TRUST_CONTEXT:
+      trust = "CONTEXT";
+      break;
+    default:
+      break;
+  }
+
+  return trust;
+}
+
 // Maps the stacktrace information from a minidump into our Stacktrace struct
 static Stacktrace getStack(int thread_num, const CallStack* stack)  {
   int frame_count = stack->frames()->size();
@@ -56,34 +88,7 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
     string returnAddress = HexString(frame->ReturnAddress());
     string symbolAddress = HexString(frame->function_base);
     string codeFile;
-    string trust = "";
-  
-    // TODO: Maybe split this into a function but when I try I get "use of undeclared identifier 'getFrameTrust'" when trying to build
-    switch(frame->trust) {
-      case StackFrame::FRAME_TRUST_NONE:
-        trust = "NONE";
-        break;
-      case StackFrame::FRAME_TRUST_SCAN:
-        trust = "SCAN";
-        break;
-      case StackFrame::FRAME_TRUST_CFI_SCAN:
-        trust = "CFI_SCAN";
-        break;
-      case StackFrame::FRAME_TRUST_FP:
-      trust = "FP";
-      break;
-      case StackFrame::FRAME_TRUST_CFI:
-      trust = "CFI";
-      break;
-      case StackFrame::FRAME_TRUST_PREWALKED:
-      trust = "PREWALKED";
-      break;
-      case StackFrame::FRAME_TRUST_CONTEXT:
-      trust = "CONTEXT";
-      break;
-      default:
-        break;
-    }
+    string trust = getTrustWithoutPrefix(frame->trust);
 
     if (symbolAddress == "0x0") {
       symbolAddress = "";
