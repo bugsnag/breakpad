@@ -19,6 +19,7 @@ extern "C" {
     const char* returnAddress;
     const char* symbolAddress;
     const char* codeFile;
+    const char* trust;
 
     void destroy() {
       // TODO ensure that it is not null first (in all of the destroy functions)
@@ -31,6 +32,7 @@ extern "C" {
       free((void *)returnAddress);
       free((void *)symbolAddress);
       free((void *)codeFile);
+      free((void *)trust);
     }
   } Stackframe;
 

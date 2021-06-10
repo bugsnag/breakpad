@@ -56,6 +56,34 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
     string returnAddress = HexString(frame->ReturnAddress());
     string symbolAddress = HexString(frame->function_base);
     string codeFile;
+    string trust = "";
+  
+    // TODO: Maybe split this into a function but when I try I get "use of undeclared identifier 'getFrameTrust'" when trying to build
+    switch(frame->trust) {
+      case StackFrame::FRAME_TRUST_NONE:
+        trust = "NONE";
+        break;
+      case StackFrame::FRAME_TRUST_SCAN:
+        trust = "SCAN";
+        break;
+      case StackFrame::FRAME_TRUST_CFI_SCAN:
+        trust = "CFI_SCAN";
+        break;
+      case StackFrame::FRAME_TRUST_FP:
+      trust = "FP";
+      break;
+      case StackFrame::FRAME_TRUST_CFI:
+      trust = "CFI";
+      break;
+      case StackFrame::FRAME_TRUST_PREWALKED:
+      trust = "PREWALKED";
+      break;
+      case StackFrame::FRAME_TRUST_CONTEXT:
+      trust = "CONTEXT";
+      break;
+      default:
+        break;
+    }
 
     if (symbolAddress == "0x0") {
       symbolAddress = "";
@@ -78,7 +106,8 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
       .moduleName = strdup(moduleName.c_str()),
       .returnAddress = strdup(returnAddress.c_str()),
       .symbolAddress = strdup(symbolAddress.c_str()),
-      .codeFile = strdup(codeFile.c_str())
+      .codeFile = strdup(codeFile.c_str()),
+      .trust = strdup(trust.c_str())
     };
     frames.push_back(f);
   }
@@ -199,6 +228,38 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
   }
 
   return result;
+}
+
+string getFrameTrust(StackFrame::FrameTrust frameTrust) {
+  string trust = "";
+  
+  switch(frameTrust) {
+    case StackFrame::FRAME_TRUST_NONE:
+      trust = "NONE";
+      break;
+    case StackFrame::FRAME_TRUST_SCAN:
+      trust = "SCAN";
+      break;
+    case StackFrame::FRAME_TRUST_CFI_SCAN:
+      trust = "CFI_SCAN";
+      break;
+    case StackFrame::FRAME_TRUST_FP:
+    trust = "FP";
+    break;
+    case StackFrame::FRAME_TRUST_CFI:
+    trust = "CFI";
+    break;
+    case StackFrame::FRAME_TRUST_PREWALKED:
+    trust = "PREWALKED";
+    break;
+    case StackFrame::FRAME_TRUST_CONTEXT:
+    trust = "CONTEXT";
+    break;
+    default:
+      break;
+  }
+
+  return trust;
 }
 
 // Gets a friendly version of a minidump processing failure reason
