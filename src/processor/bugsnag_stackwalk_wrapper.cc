@@ -48,28 +48,37 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
     const StackFrame* frame = stack->frames()->at(frame_index);
 
     string frameAddress = HexString(frame->instruction);
-    string returnAddress;
+    string method = frame->function_name;
     string loadAddress = "";
     string filename = "";
     string moduleId = "";
     string moduleName = "";
+    string returnAddress = HexString(frame->ReturnAddress());
+    string symbolAddress = HexString(frame->function_base);
+    string codeFile;
+
+    if (symbolAddress == "0x0") {
+      symbolAddress = "";
+    }
+
     if (frame->module) {
-      returnAddress = HexString(frame->ReturnAddress() - frame->module->base_address());
       loadAddress = HexString(frame->module->base_address());
       filename = frame->module->code_file();
       moduleId = frame->module->debug_identifier();
       moduleName = frame->module->debug_file();
-    } else {
-      returnAddress = HexString(frame->ReturnAddress());
+      codeFile = frame->module->code_file();
     }
     
     Stackframe f = {
       .filename = strdup(filename.c_str()),
-      .method = strdup(returnAddress.c_str()),
+      .method = strdup(method.c_str()),
       .frameAddress = strdup(frameAddress.c_str()),
       .loadAddress = strdup(loadAddress.c_str()),
       .moduleId = strdup(moduleId.c_str()),
-      .moduleName = strdup(moduleName.c_str())
+      .moduleName = strdup(moduleName.c_str()),
+      .returnAddress = strdup(returnAddress.c_str()),
+      .symbolAddress = strdup(symbolAddress.c_str()),
+      .codeFile = strdup(codeFile.c_str())
     };
     frames.push_back(f);
   }
