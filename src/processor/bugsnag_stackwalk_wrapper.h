@@ -137,7 +137,7 @@ extern "C" {
   } WrappedModuleDetails;
 
   WrappedModuleDetails GetModuleDetails(const char* minidump_filename);
-  WrappedEvent GetEventFromMinidump(const char* filename, const char* symbol_path);
+  WrappedEvent GetEventFromMinidump(const char* filename, const int symbol_path_count, const char** symbol_paths);
   void FreeEvent(WrappedEvent* wrapped_event);
   void FreeModuleDetails(WrappedModuleDetails* wrapped_module_details);
 

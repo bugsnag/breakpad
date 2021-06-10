@@ -270,14 +270,18 @@ string getFriendlyFailureReason(ProcessResult process_result) {
 
 // Gets an Event payload from the minidump.
 // Note: Logic for parsing the minidump is based on PrintMinidumpProcess in minidump_stackwalk.cc
-WrappedEvent GetEventFromMinidump(const char* filename, const char* symbol_path) {
+WrappedEvent GetEventFromMinidump(const char* filename, const int symbol_path_count, const char** symbol_paths) {
   WrappedEvent result = {{0}};
 
   try {
-    // Apply a symbol supplier if we've been given a symbol path (to allow the stack data to be used when walking the stacktrace)
+    // Apply a symbol supplier if we've been given one or more symbol paths (to allow the stack data to be used when walking the stacktrace)
+    std::vector<string> supplied_symbol_paths;
     scoped_ptr<SimpleSymbolSupplier> symbol_supplier;
-    if (symbol_path != NULL && strlen(symbol_path) > 0) {
-      symbol_supplier.reset(new SimpleSymbolSupplier(symbol_path));
+    for (int i = 0; i < symbol_path_count; i++) {
+      supplied_symbol_paths.push_back(symbol_paths[i]);
+    }
+    if (!supplied_symbol_paths.empty()) {
+      symbol_supplier.reset(new SimpleSymbolSupplier(supplied_symbol_paths));
     }
 
     BasicSourceLineResolver resolver;
