@@ -39,7 +39,7 @@ int getErrorReportingThreadIndex(const ProcessState& process_state) {
 }
 
 // strips the `FRAME_TRUST_` from the trust enum
-string getTrustWithoutPrefix(StackFrame::FrameTrust stackFrameTrust)  {
+string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust)  {
   string trust = "";
   switch(stackFrameTrust) {
     case StackFrame::FRAME_TRUST_NONE:
@@ -88,7 +88,7 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
     string returnAddress = HexString(frame->ReturnAddress());
     string symbolAddress = HexString(frame->function_base);
     string codeFile;
-    string trust = getTrustWithoutPrefix(frame->trust);
+    string trust = getFriendlyTrustValue(frame->trust);
 
     if (symbolAddress == "0x0") {
       symbolAddress = "";
@@ -233,38 +233,6 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
   }
 
   return result;
-}
-
-string getFrameTrust(StackFrame::FrameTrust frameTrust) {
-  string trust = "";
-  
-  switch(frameTrust) {
-    case StackFrame::FRAME_TRUST_NONE:
-      trust = "NONE";
-      break;
-    case StackFrame::FRAME_TRUST_SCAN:
-      trust = "SCAN";
-      break;
-    case StackFrame::FRAME_TRUST_CFI_SCAN:
-      trust = "CFI_SCAN";
-      break;
-    case StackFrame::FRAME_TRUST_FP:
-    trust = "FP";
-    break;
-    case StackFrame::FRAME_TRUST_CFI:
-    trust = "CFI";
-    break;
-    case StackFrame::FRAME_TRUST_PREWALKED:
-    trust = "PREWALKED";
-    break;
-    case StackFrame::FRAME_TRUST_CONTEXT:
-    trust = "CONTEXT";
-    break;
-    default:
-      break;
-  }
-
-  return trust;
 }
 
 // Gets a friendly version of a minidump processing failure reason
