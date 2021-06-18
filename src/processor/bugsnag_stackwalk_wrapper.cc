@@ -12,6 +12,7 @@
 #include "google_breakpad/processor/process_state.h"
 #include "google_breakpad/processor/call_stack.h"
 #include "google_breakpad/processor/stack_frame_cpu.h"
+#include "processor/pathname_stripper.h"
 
 using google_breakpad::BasicSourceLineResolver;
 using google_breakpad::CallStack;
@@ -27,6 +28,7 @@ using google_breakpad::ProcessState;
 using google_breakpad::scoped_ptr;
 using google_breakpad::SimpleSymbolSupplier;
 using google_breakpad::StackFrame;
+using google_breakpad::PathnameStripper;
 
 // Gets the index of the thread that requested a dump be written
 int getErrorReportingThreadIndex(const ProcessState& process_state) {
@@ -220,7 +222,7 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
       string debug_identifier = module->debug_identifier();
       module_ids[i] = strdup(debug_identifier.c_str());
 
-      string debug_file = module->debug_file();
+      string debug_file = PathnameStripper::File(module->debug_file());
       module_names[i] = strdup(debug_file.c_str());
     };
     result.moduleDetails.moduleIds = module_ids;
