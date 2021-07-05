@@ -97,7 +97,7 @@ void Symbolicate(string filename, string symbol_path, string uuid, string addres
 
 int main(int argc, const char* argv[]) {
   if (argc != 5) {
-    fprintf(stderr, "Usage: bugsnag_symbolication <minidump> <path/to/symbols> <uuid> <address>\n");
+    fprintf(stderr, "Usage: bugsnag_symbolicator <minidump> <path/to/symbols> <uuid> <address>\n");
     exit(1);
   }
 
