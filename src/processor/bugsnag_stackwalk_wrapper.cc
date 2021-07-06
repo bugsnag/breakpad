@@ -30,6 +30,22 @@ using google_breakpad::SimpleSymbolSupplier;
 using google_breakpad::StackFrame;
 using google_breakpad::PathnameStripper;
 
+// Wraps strdup and throws runtime_error if memory allocation fails
+char *strdupWrapper(const char *s) {
+  char *str = strdup(s);
+  if (NULL == str) {
+    throw std::runtime_error("Memory allocation error");
+  }
+  return str;
+}
+
+
+// Calls free() on passed pointer and sets it to NULL
+void freeAndInvalidate(void* p) {
+  free((void *)p);
+  p = NULL;
+}
+
 // Gets the index of the thread that requested a dump be written
 int getErrorReportingThreadIndex(const ProcessState& process_state) {
   int index = process_state.requesting_thread();
@@ -80,6 +96,9 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
 
   for (int frame_index = 0; frame_index < frame_count; ++frame_index) {
     const StackFrame* frame = stack->frames()->at(frame_index);
+    if (NULL == frame) {
+      throw std::runtime_error("Bad frame index");
+    }
 
     string frameAddress = HexString(frame->instruction);
     string method = frame->function_name;
@@ -105,16 +124,16 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
     }
     
     Stackframe f = {
-      .filename = strdup(filename.c_str()),
-      .method = strdup(method.c_str()),
-      .frameAddress = strdup(frameAddress.c_str()),
-      .loadAddress = strdup(loadAddress.c_str()),
-      .moduleId = strdup(moduleId.c_str()),
-      .moduleName = strdup(moduleName.c_str()),
-      .returnAddress = strdup(returnAddress.c_str()),
-      .symbolAddress = strdup(symbolAddress.c_str()),
-      .codeFile = strdup(codeFile.c_str()),
-      .trust = strdup(trust.c_str())
+      .filename = strdupWrapper(filename.c_str()),
+      .method = strdupWrapper(method.c_str()),
+      .frameAddress = strdupWrapper(frameAddress.c_str()),
+      .loadAddress = strdupWrapper(loadAddress.c_str()),
+      .moduleId = strdupWrapper(moduleId.c_str()),
+      .moduleName = strdupWrapper(moduleName.c_str()),
+      .returnAddress = strdupWrapper(returnAddress.c_str()),
+      .symbolAddress = strdupWrapper(symbolAddress.c_str()),
+      .codeFile = strdupWrapper(codeFile.c_str()),
+      .trust = strdupWrapper(trust.c_str())
     };
     frames.push_back(f);
   }
@@ -158,11 +177,11 @@ Event getEvent(const ProcessState& process_state) {
 
   Exception e = {
     .stacktrace = s,
-    .errorClass = strdup(process_state.crash_reason().c_str())
+    .errorClass = strdupWrapper(process_state.crash_reason().c_str())
   };
   string crashAddress = HexString(process_state.crash_address());
   if (crashAddress != "") {
-    e.crashAddress = strdup(crashAddress.c_str());
+    e.crashAddress = strdupWrapper(crashAddress.c_str());
   }
 
   int uptime = 0;
@@ -174,12 +193,12 @@ Event getEvent(const ProcessState& process_state) {
 
   App app = {
     .duration = uptime, // TODO - Handle this being empty
-    .binaryArch = strdup(process_state.system_info()->cpu.c_str())
+    .binaryArch = strdupWrapper(process_state.system_info()->cpu.c_str())
   };
 
   Device device = {
-    .osName = strdup(process_state.system_info()->os.data()),
-    .osVersion = strdup(process_state.system_info()->os_version.c_str())
+    .osName = strdupWrapper(process_state.system_info()->os.data()),
+    .osVersion = strdupWrapper(process_state.system_info()->os_version.c_str())
   };
   
   int thread_count = process_state.threads()->size();
@@ -201,37 +220,46 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
   try {
     Minidump dump(minidump_filename);
     if (!dump.Read()) {
-      result.pstrErr = strdup("failed to read minidump");
+      result.pstrErr = strdupWrapper("failed to read minidump");
       return result;
     }
 
     MinidumpModuleList* module_list = dump.GetModuleList();
     if (!module_list) {
-      result.pstrErr = strdup("failed to get module list");
+      result.pstrErr = strdupWrapper("failed to get module list");
       return result;
     }
 
     result.moduleDetails.moduleCount = module_list->module_count();
 
     char **module_ids = (char**)malloc(sizeof(char*) * module_list->module_count());
+    if (NULL == module_ids) {
+      throw std::runtime_error("Memory allocation error");
+    }
     char **module_names = (char**)malloc(sizeof(char*) * module_list->module_count());
+    if (NULL == module_names) {
+      throw std::runtime_error("Memory allocation error");
+    }
 
     for (unsigned int i = 0; i < module_list->module_count(); i++) {
       const MinidumpModule* module = module_list->GetModuleAtIndex(i);
+      if (NULL == module) {
+        throw std::runtime_error("Bad module index");
+      }
 
       string debug_identifier = module->debug_identifier();
-      module_ids[i] = strdup(debug_identifier.c_str());
+      module_ids[i] = strdupWrapper(debug_identifier.c_str());
 
       string debug_file = PathnameStripper::File(module->debug_file());
-      module_names[i] = strdup(debug_file.c_str());
+      module_names[i] = strdupWrapper(debug_file.c_str());
     };
     result.moduleDetails.moduleIds = module_ids;
     result.moduleDetails.moduleNames = module_names;
   } catch(const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
-    result.pstrErr = strdup(errMsg.c_str());
+    result.pstrErr = strdupWrapper(errMsg.c_str());
   } catch(...) {
-    result.pstrErr = strdup("encountered unknown exception");
+    result.pstrErr = strdupWrapper("encountered unknown exception");
   }
 
   return result;
@@ -304,7 +332,7 @@ WrappedEvent GetEventFromMinidump(const char* filename, const int symbol_path_co
     ProcessResult process_result = minidump_processor.Process(&dump, &process_state);
     if (process_result != google_breakpad::PROCESS_OK) {
       string errMsg = "failed to process minidump: " + getFriendlyFailureReason(process_result);
-      result.pstrErr = strdup(errMsg.c_str());
+      result.pstrErr = strdupWrapper(errMsg.c_str());
       return result;
     }
 
@@ -312,9 +340,9 @@ WrappedEvent GetEventFromMinidump(const char* filename, const int symbol_path_co
     result.event = getEvent(process_state);
   } catch(const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
-    result.pstrErr = strdup(errMsg.c_str());
+    result.pstrErr = strdupWrapper(errMsg.c_str());
   } catch(...) {
-    result.pstrErr = strdup("encountered unknown exception");
+    result.pstrErr = strdupWrapper("encountered unknown exception");
   }
 
   return result;
@@ -330,4 +358,72 @@ void FreeEvent(WrappedEvent* wrapped_event) {
 // TODO - Check there are no memory leaks
 void FreeModuleDetails(WrappedModuleDetails* wrapped_module_details) {
   wrapped_module_details->destroy();
+}
+
+void WrappedEvent::destroy() {
+  freeAndInvalidate((void *)pstrErr);
+  event.destroy();
+}
+
+void WrappedModuleDetails::destroy() {
+  freeAndInvalidate((void *)pstrErr);
+  moduleDetails.destroy();
+}
+
+void Stackframe::destroy() {
+  freeAndInvalidate((void *)filename);
+  freeAndInvalidate((void *)method);
+  freeAndInvalidate((void *)frameAddress);
+  freeAndInvalidate((void *)loadAddress);
+  freeAndInvalidate((void *)moduleId);
+  freeAndInvalidate((void *)moduleName);
+  freeAndInvalidate((void *)returnAddress);
+  freeAndInvalidate((void *)symbolAddress);
+  freeAndInvalidate((void *)codeFile);
+  freeAndInvalidate((void *)trust);
+}
+
+void Stacktrace::destroy() {
+  for (int i = 0; i < frameCount; ++i) {
+    frames[i].destroy();
+  }
+  freeAndInvalidate(frames);
+}
+
+void Exception::destroy() {
+  freeAndInvalidate((void *)errorClass);
+  freeAndInvalidate((void *)crashAddress);
+  stacktrace.destroy();
+}
+
+void App::destroy() {
+  freeAndInvalidate((void *)binaryArch);
+}
+
+void Device::destroy() {
+  freeAndInvalidate((void *)osName);
+  freeAndInvalidate((void *)osVersion);
+}
+
+void Thread::destroy() {
+  stacktrace.destroy();
+}
+
+void Event::destroy() {
+  app.destroy();
+  device.destroy();
+  exception.destroy();
+  for (int i = 0; i < threadCount; ++i) {
+    threads[i].destroy();
+  }
+  freeAndInvalidate(threads);
+}
+
+void ModuleDetails::destroy() {
+  for (int i = 0; i < moduleCount; i++) {
+    freeAndInvalidate((void *)moduleIds[i]);
+    freeAndInvalidate((void *)moduleNames[i]);
+  }
+  freeAndInvalidate((void *)moduleIds);
+  freeAndInvalidate((void *)moduleNames);
 }
