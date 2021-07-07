@@ -7,81 +7,69 @@
 extern "C" {
 #endif
 
-  typedef void (*Destroy)(void* self);
-
   typedef struct Stackframe {
-      const char* filename;
-      const char* method;
-      const char* frameAddress;
-      const char* loadAddress;
-      const char* moduleId;
-      const char* moduleName;
-      const char* returnAddress;
-      const char* symbolAddress;
-      const char* codeFile;
-      const char* trust;
-      Destroy destroy;
+    const char* filename;
+    const char* method;
+    const char* frameAddress;
+    const char* loadAddress;
+    const char* moduleId;
+    const char* moduleName;
+    const char* returnAddress;
+    const char* symbolAddress;
+    const char* codeFile;
+    const char* trust;
   } Stackframe;
 
   typedef struct Stacktrace {
-      int frameCount;
-      Stackframe* frames;
-      Destroy destroy;
+    int frameCount;
+    Stackframe* frames;
   } Stacktrace;
 
   typedef struct Exception {
-      Stacktrace stacktrace;
-      const char* errorClass;
-      const char* crashAddress;
-      Destroy destroy;
+    Stacktrace stacktrace;
+    const char* errorClass;
+    const char* crashAddress;
   } Exception;
 
   typedef struct App {
-      int duration;
-      const char* binaryArch;
-      Destroy destroy;
+    int duration;
+    const char* binaryArch;
   } App;
 
   typedef struct Device {
-      const char* osName;
-      const char* osVersion;
-      Destroy destroy;
+    const char* osName;
+    const char* osVersion;
   } Device;
 
   typedef struct Thread {
-      int id;
-      bool errorReportingThread;
-      Stacktrace stacktrace;
-      Destroy destroy;
+    int id;
+    bool errorReportingThread;
+    Stacktrace stacktrace;
   } Thread;
 
   typedef struct Event {
-      int threadCount;
-      const char* temp;
-      Exception exception;
-      App app;
-      Device device;
-      Thread* threads;
-      Destroy destroy;
+    int threadCount;
+    const char* temp;
+    Exception exception;
+    App app;
+    Device device;
+    Thread* threads;
   } Event;
 
   typedef struct ModuleDetails {
-      int moduleCount;
-      char** moduleIds;
-      char** moduleNames;
-      Destroy destroy;
+    int moduleCount;
+    char** moduleIds;
+    char** moduleNames;
   } ModuleDetails;
 
   typedef struct WrappedEvent {
     Event event;
     const char *pstrErr;
-    Destroy destroy;
   } WrappedEvent;
 
   typedef struct WrappedModuleDetails {
     ModuleDetails moduleDetails;
     const char *pstrErr;
-    Destroy destroy;
   } WrappedModuleDetails;
 
   WrappedModuleDetails GetModuleDetails(const char* minidump_filename);

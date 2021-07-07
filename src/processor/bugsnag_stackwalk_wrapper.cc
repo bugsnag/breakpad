@@ -80,7 +80,7 @@ void destroyStacktrace(void* self) {
   if (NULL == stacktrace) return;
 
   for (int i = 0; i < stacktrace->frameCount; ++i) {
-    stacktrace->frames[i].destroy(&stacktrace->frames[i]);
+    destroyStackframe(&stacktrace->frames[i]);
   }
   freeAndInvalidate(stacktrace->frames);
 }
@@ -91,7 +91,7 @@ void destroyException(void* self) {
 
   freeAndInvalidate((void *)exception->errorClass);
   freeAndInvalidate((void *)exception->crashAddress);
-  exception->stacktrace.destroy(&exception->stacktrace);
+  destroyStacktrace(&exception->stacktrace);
 }
 
 void destroyApp(void* self) {
@@ -113,18 +113,18 @@ void destroyThread(void* self) {
   Thread* thread = (Thread*)self;
   if (NULL == thread) return;
 
-  thread->stacktrace.destroy(&thread->stacktrace);
+  destroyStacktrace(&thread->stacktrace);
 }
 
 void destroyEvent(void* self) {
   Event* event = (Event*)self;
   if (NULL == event) return;
 
-  event->app.destroy(&event->app);
-  event->device.destroy(&event->device);
-  event->exception.destroy(&event->exception);
+  destroyApp(&event->app);
+  destroyDevice(&event->device);
+  destroyException(&event->exception);
   for (int i = 0; i < event->threadCount; ++i) {
-    event->threads[i].destroy(&event->threads[i]);
+    destroyThread(&event->threads[i]);
   }
   freeAndInvalidate(event->threads);
 }
@@ -146,7 +146,7 @@ void destroyWrappedEvent(void* self) {
   if (NULL == wrappedEvent) return;
 
   freeAndInvalidate((void *)wrappedEvent->pstrErr);
-  wrappedEvent->event.destroy(&wrappedEvent->event);
+  destroyEvent(&wrappedEvent->event);
 }
 
 void destroyWrappedModuleDetails(void* self) {
@@ -154,7 +154,7 @@ void destroyWrappedModuleDetails(void* self) {
   if (NULL == wrappedModuleDetails) return;
 
   freeAndInvalidate((void *)wrappedModuleDetails->pstrErr);
-  wrappedModuleDetails->moduleDetails.destroy(&wrappedModuleDetails->moduleDetails);
+  destroyModuleDetails(&wrappedModuleDetails->moduleDetails);
 }
 
 // strips the `FRAME_TRUST_` from the trust enum
@@ -234,8 +234,7 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
       .returnAddress = strdupWrapper(returnAddress.c_str()),
       .symbolAddress = strdupWrapper(symbolAddress.c_str()),
       .codeFile = strdupWrapper(codeFile.c_str()),
-      .trust = strdupWrapper(trust.c_str()),
-      .destroy = destroyStackframe
+      .trust = strdupWrapper(trust.c_str())
     };
     frames.push_back(f);
   }
@@ -247,8 +246,7 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
 
   Stacktrace s = {
     .frameCount = frame_count,
-    .frames = stackframes,
-    .destroy = destroyStacktrace
+    .frames = stackframes
   };
 
   return s;
@@ -266,8 +264,7 @@ Thread* getThreads(const ProcessState& process_state) {
       Thread t = {
         .id = thread_id,
         .errorReportingThread = (i == error_reporting_thread_index),
-        .stacktrace = getStack(i, thread),
-        .destroy = destroyThread
+        .stacktrace = getStack(i, thread)
       };
       threads[i] = t;
   }
@@ -281,8 +278,7 @@ Event getEvent(const ProcessState& process_state) {
 
   Exception e = {
     .stacktrace = s,
-    .errorClass = strdupWrapper(process_state.crash_reason().c_str()),
-    .destroy = destroyException
+    .errorClass = strdupWrapper(process_state.crash_reason().c_str())
   };
   string crashAddress = HexString(process_state.crash_address());
   if (crashAddress != "") {
@@ -298,14 +294,12 @@ Event getEvent(const ProcessState& process_state) {
 
   App app = {
     .duration = uptime, // TODO - Handle this being empty
-    .binaryArch = strdupWrapper(process_state.system_info()->cpu.c_str()),
-    .destroy = destroyApp
+    .binaryArch = strdupWrapper(process_state.system_info()->cpu.c_str())
   };
 
   Device device = {
     .osName = strdupWrapper(process_state.system_info()->os.data()),
-    .osVersion = strdupWrapper(process_state.system_info()->os_version.c_str()),
-    .destroy = destroyDevice
+    .osVersion = strdupWrapper(process_state.system_info()->os_version.c_str())
   };
   
   int thread_count = process_state.threads()->size();
@@ -314,8 +308,7 @@ Event getEvent(const ProcessState& process_state) {
     .exception = e,
     .app = app,
     .device = device,
-    .threads = getThreads(process_state),
-    .destroy = destroyEvent
+    .threads = getThreads(process_state)
   };
 
   return returnEvent;
@@ -363,7 +356,6 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
     };
     result.moduleDetails.moduleIds = module_ids;
     result.moduleDetails.moduleNames = module_names;
-    result.destroy = destroyModuleDetails;
   } catch(const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
     result.pstrErr = strdupWrapper(errMsg.c_str());
@@ -447,7 +439,6 @@ WrappedEvent GetEventFromMinidump(const char* filename, const int symbol_path_co
 
     // Map the process state to an Event struct
     result.event = getEvent(process_state);
-    result.destroy = destroyWrappedEvent;
   } catch(const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
     result.pstrErr = strdupWrapper(errMsg.c_str());
@@ -462,7 +453,7 @@ WrappedEvent GetEventFromMinidump(const char* filename, const int symbol_path_co
 // TODO - Check there are no memory leaks
 void FreeEvent(WrappedEvent* wrapped_event) {
   if (NULL != wrapped_event) {
-    wrapped_event->destroy(wrapped_event);
+    destroyWrappedEvent(wrapped_event);
   }
 }
 
@@ -470,6 +461,6 @@ void FreeEvent(WrappedEvent* wrapped_event) {
 // TODO - Check there are no memory leaks
 void FreeModuleDetails(WrappedModuleDetails* wrapped_module_details) {
   if (NULL != wrapped_module_details) {
-    wrapped_module_details->destroy(wrapped_module_details);
+    destroyWrappedModuleDetails(wrapped_module_details);
   }
 }
