@@ -41,6 +41,9 @@ extern "C" {
     Stackframe* frames;
 
     void destroy() {
+      for (int i = 0; i < frameCount; i++) {
+        frames[i].destroy();
+      }
       free(frames);
     }
   } Stacktrace;
@@ -97,6 +100,10 @@ extern "C" {
     void destroy() {
       app.destroy();
       device.destroy();
+      exception.destroy();
+      for (int i = 0; i < threadCount; i++) {
+        threads[i].destroy();
+      }
       free(threads);
     }
   } Event;
