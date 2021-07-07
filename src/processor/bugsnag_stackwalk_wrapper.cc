@@ -98,7 +98,7 @@ void destroyException(void* self) {
 
   freeAndInvalidate((void *)exception->errorClass);
   freeAndInvalidate((void *)exception->crashAddress);
-  exception->stacktrace.destroy(&(exception->stacktrace));
+  exception->stacktrace.destroy(&exception->stacktrace);
 }
 
 void destroyApp(void* self) {
@@ -126,7 +126,7 @@ void destroyThread(void* self) {
     return;
   }
 
-  thread->stacktrace.destroy(&(thread->stacktrace));
+  thread->stacktrace.destroy(&thread->stacktrace);
 }
 
 void destroyEvent(void* self) {
@@ -135,11 +135,11 @@ void destroyEvent(void* self) {
     return;
   }
 
-  event->app.destroy(&(event->app));
-  event->device.destroy(&(event->device));
-  event->exception.destroy(&(event->exception));
+  event->app.destroy(&event->app);
+  event->device.destroy(&event->device);
+  event->exception.destroy(&event->exception);
   for (int i = 0; i < event->threadCount; ++i) {
-    event->threads[i].destroy(&(event->threads[i]));
+    event->threads[i].destroy(&event->threads[i]);
   }
   freeAndInvalidate(event->threads);
 }
@@ -165,7 +165,7 @@ void destroyWrappedEvent(void* self) {
   }
 
   freeAndInvalidate((void *)wrappedEvent->pstrErr);
-  wrappedEvent->event.destroy(&(wrappedEvent->event));
+  wrappedEvent->event.destroy(&wrappedEvent->event);
 }
 
 void destroyWrappedModuleDetails(void* self) {
@@ -175,7 +175,7 @@ void destroyWrappedModuleDetails(void* self) {
   }
 
   freeAndInvalidate((void *)wrappedModuleDetails->pstrErr);
-  wrappedModuleDetails->moduleDetails.destroy(&(wrappedModuleDetails->moduleDetails));
+  wrappedModuleDetails->moduleDetails.destroy(&wrappedModuleDetails->moduleDetails);
 }
 
 // strips the `FRAME_TRUST_` from the trust enum
