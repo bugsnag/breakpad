@@ -1,13 +1,13 @@
 #ifndef STACKWALK_WRAPPER_H
 #define STACKWALK_WRAPPER_H
 
-#include <string.h>
-#include <string>
-#include <vector>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+  typedef void (*Destroy)(void* self);
 
   typedef struct Stackframe {
       const char* filename;
@@ -20,45 +20,39 @@ extern "C" {
       const char* symbolAddress;
       const char* codeFile;
       const char* trust;
-
-      void destroy();
+      Destroy destroy;
   } Stackframe;
 
   typedef struct Stacktrace {
       int frameCount;
       Stackframe* frames;
-
-      void destroy();
+      Destroy destroy;
   } Stacktrace;
 
   typedef struct Exception {
       Stacktrace stacktrace;
       const char* errorClass;
       const char* crashAddress;
-
-      void destroy();
+      Destroy destroy;
   } Exception;
 
   typedef struct App {
       int duration;
       const char* binaryArch;
-
-      void destroy();
+      Destroy destroy;
   } App;
 
   typedef struct Device {
       const char* osName;
       const char* osVersion;
-
-      void destroy();
+      Destroy destroy;
   } Device;
 
   typedef struct Thread {
       int id;
       bool errorReportingThread;
       Stacktrace stacktrace;
-
-      void destroy();
+      Destroy destroy;
   } Thread;
 
   typedef struct Event {
@@ -68,30 +62,26 @@ extern "C" {
       App app;
       Device device;
       Thread* threads;
-
-      void destroy();
+      Destroy destroy;
   } Event;
 
   typedef struct ModuleDetails {
       int moduleCount;
       char** moduleIds;
       char** moduleNames;
-
-      void destroy();
+      Destroy destroy;
   } ModuleDetails;
 
   typedef struct WrappedEvent {
     Event event;
     const char *pstrErr;
-
-    void destroy();
+    Destroy destroy;
   } WrappedEvent;
 
   typedef struct WrappedModuleDetails {
     ModuleDetails moduleDetails;
     const char *pstrErr;
-
-    void destroy();
+    Destroy destroy;
   } WrappedModuleDetails;
 
   WrappedModuleDetails GetModuleDetails(const char* minidump_filename);
