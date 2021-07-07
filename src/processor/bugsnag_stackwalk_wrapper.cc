@@ -61,9 +61,7 @@ int getErrorReportingThreadIndex(const ProcessState& process_state) {
 
 void destroyStackframe(void* self) {
   Stackframe* stackframe = (Stackframe*)self;
-  if (NULL == stackframe) {
-    return;
-  }
+  if (NULL == stackframe) return;
 
   freeAndInvalidate((void *)stackframe->filename);
   freeAndInvalidate((void *)stackframe->method);
@@ -79,12 +77,9 @@ void destroyStackframe(void* self) {
 
 void destroyStacktrace(void* self) {
   Stacktrace* stacktrace = (Stacktrace*)self;
-  if (NULL == stacktrace) {
-    return;
-  }
+  if (NULL == stacktrace) return;
 
   for (int i = 0; i < stacktrace->frameCount; ++i) {
-    //frames[i].destroy();
     stacktrace->frames[i].destroy(&stacktrace->frames[i]);
   }
   freeAndInvalidate(stacktrace->frames);
@@ -92,9 +87,7 @@ void destroyStacktrace(void* self) {
 
 void destroyException(void* self) {
   Exception* exception = (Exception*)self;
-  if (NULL == exception) {
-    return;
-  }
+  if (NULL == exception) return;
 
   freeAndInvalidate((void *)exception->errorClass);
   freeAndInvalidate((void *)exception->crashAddress);
@@ -103,18 +96,14 @@ void destroyException(void* self) {
 
 void destroyApp(void* self) {
   App* app = (App*)self;
-  if (NULL == app) {
-    return;
-  }
+  if (NULL == app) return;
 
   freeAndInvalidate((void *)app->binaryArch);
 }
 
 void destroyDevice(void* self) {
   Device* device = (Device*)self;
-  if (NULL == device) {
-    return;
-  }
+  if (NULL == device) return;
 
   freeAndInvalidate((void *)device->osName);
   freeAndInvalidate((void *)device->osVersion);
@@ -122,18 +111,14 @@ void destroyDevice(void* self) {
 
 void destroyThread(void* self) {
   Thread* thread = (Thread*)self;
-  if (NULL == thread) {
-    return;
-  }
+  if (NULL == thread) return;
 
   thread->stacktrace.destroy(&thread->stacktrace);
 }
 
 void destroyEvent(void* self) {
   Event* event = (Event*)self;
-  if (NULL == event) {
-    return;
-  }
+  if (NULL == event) return;
 
   event->app.destroy(&event->app);
   event->device.destroy(&event->device);
@@ -146,9 +131,7 @@ void destroyEvent(void* self) {
 
 void destroyModuleDetails(void* self) {
   ModuleDetails* moduleDetails = (ModuleDetails*)self;
-  if (NULL == moduleDetails) {
-    return;
-  }
+  if (NULL == moduleDetails) return;
 
   for (int i = 0; i < moduleDetails->moduleCount; i++) {
     freeAndInvalidate((void *)moduleDetails->moduleIds[i]);
@@ -160,9 +143,7 @@ void destroyModuleDetails(void* self) {
 
 void destroyWrappedEvent(void* self) {
   WrappedEvent* wrappedEvent = (WrappedEvent*)self;
-  if (NULL == wrappedEvent) {
-    return;
-  }
+  if (NULL == wrappedEvent) return;
 
   freeAndInvalidate((void *)wrappedEvent->pstrErr);
   wrappedEvent->event.destroy(&wrappedEvent->event);
@@ -170,9 +151,7 @@ void destroyWrappedEvent(void* self) {
 
 void destroyWrappedModuleDetails(void* self) {
   WrappedModuleDetails* wrappedModuleDetails = (WrappedModuleDetails*)self;
-  if (NULL == wrappedModuleDetails) {
-    return;
-  }
+  if (NULL == wrappedModuleDetails) return;
 
   freeAndInvalidate((void *)wrappedModuleDetails->pstrErr);
   wrappedModuleDetails->moduleDetails.destroy(&wrappedModuleDetails->moduleDetails);
@@ -494,92 +473,3 @@ void FreeModuleDetails(WrappedModuleDetails* wrapped_module_details) {
     wrapped_module_details->destroy(wrapped_module_details);
   }
 }
-
-/*
-void WrappedEvent::destroy() {
-  freeAndInvalidate((void *)pstrErr);
-  event.destroy(&event);
-}
-*/
-
-/*
-void WrappedModuleDetails::destroy() {
-  freeAndInvalidate((void *)pstrErr);
-  moduleDetails.destroy(&moduleDetails);
-}
-*/
-
-/*
-void Stackframe::destroy() {
-  freeAndInvalidate((void *)filename);
-  freeAndInvalidate((void *)method);
-  freeAndInvalidate((void *)frameAddress);
-  freeAndInvalidate((void *)loadAddress);
-  freeAndInvalidate((void *)moduleId);
-  freeAndInvalidate((void *)moduleName);
-  freeAndInvalidate((void *)returnAddress);
-  freeAndInvalidate((void *)symbolAddress);
-  freeAndInvalidate((void *)codeFile);
-  freeAndInvalidate((void *)trust);
-}
-*/
-
-/*
-void Stacktrace::destroy() {
-  for (int i = 0; i < frameCount; ++i) {
-    //frames[i].destroy();
-    frames[i].destroy(&frames[i]);
-  }
-  freeAndInvalidate(frames);
-}
-*/
-
-/*
-void Exception::destroy() {
-  freeAndInvalidate((void *)errorClass);
-  freeAndInvalidate((void *)crashAddress);
-  stacktrace.destroy(&stacktrace);
-}
-*/
-
-/*
-void App::destroy() {
-  freeAndInvalidate((void *)binaryArch);
-}
-*/
-
-/*
-void Device::destroy() {
-  freeAndInvalidate((void *)osName);
-  freeAndInvalidate((void *)osVersion);
-}
-*/
-
-/*
-void Thread::destroy() {
-  stacktrace.destroy(&stacktrace);
-}
-*/
-
-/*
-void Event::destroy() {
-  app.destroy(&app);
-  device.destroy(&device);
-  exception.destroy(&exception);
-  for (int i = 0; i < threadCount; ++i) {
-    threads[i].destroy(&threads[i]);
-  }
-  freeAndInvalidate(threads);
-}
-*/
-
-/*
-void ModuleDetails::destroy() {
-  for (int i = 0; i < moduleCount; i++) {
-    freeAndInvalidate((void *)moduleIds[i]);
-    freeAndInvalidate((void *)moduleNames[i]);
-  }
-  freeAndInvalidate((void *)moduleIds);
-  freeAndInvalidate((void *)moduleNames);
-}
-*/
