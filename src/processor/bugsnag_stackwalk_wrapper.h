@@ -1,9 +1,7 @@
 #ifndef STACKWALK_WRAPPER_H
 #define STACKWALK_WRAPPER_H
 
-#include <string.h>
-#include <string>
-#include <vector>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,73 +18,33 @@ extern "C" {
     const char* symbolAddress;
     const char* codeFile;
     const char* trust;
-
-    void destroy() {
-      // TODO ensure that it is not null first (in all of the destroy functions)
-      free((void *)filename);
-      free((void *)method);
-      free((void *)frameAddress);
-      free((void *)loadAddress);
-      free((void *)moduleId);
-      free((void *)moduleName);
-      free((void *)returnAddress);
-      free((void *)symbolAddress);
-      free((void *)codeFile);
-      free((void *)trust);
-    }
   } Stackframe;
 
   typedef struct Stacktrace {
     int frameCount;
     Stackframe* frames;
-
-    void destroy() {
-      for (int i = 0; i < frameCount; i++) {
-        frames[i].destroy();
-      }
-      free(frames);
-    }
   } Stacktrace;
 
   typedef struct Exception {
     Stacktrace stacktrace;
     const char* errorClass;
     const char* crashAddress;
-
-    void destroy() {
-      free((void *)errorClass);
-      free((void *)crashAddress);
-      stacktrace.destroy();
-    }
   } Exception;
 
   typedef struct App {
     int duration;
     const char* binaryArch;
-  
-    void destroy() {
-      free((void *)binaryArch);
-    }
   } App;
 
   typedef struct Device {
     const char* osName;
     const char* osVersion;
-
-    void destroy() {
-      free((void *)osName);
-      free((void *)osVersion);
-    }
   } Device;
 
   typedef struct Thread {
     int id;
     bool errorReportingThread;
     Stacktrace stacktrace;
-
-    void destroy() {
-      stacktrace.destroy();
-    }
   } Thread;
 
   typedef struct Event {
@@ -96,51 +54,22 @@ extern "C" {
     App app;
     Device device;
     Thread* threads;
-
-    void destroy() {
-      app.destroy();
-      device.destroy();
-      exception.destroy();
-      for (int i = 0; i < threadCount; i++) {
-        threads[i].destroy();
-      }
-      free(threads);
-    }
   } Event;
-
-  typedef struct WrappedEvent {
-    Event event;
-    const char *pstrErr;
-
-    void destroy() {
-      free((void *)pstrErr);
-      event.destroy();
-    }
-  } WrappedEvent;
 
   typedef struct ModuleDetails {
     int moduleCount;
     char** moduleIds;
     char** moduleNames;
-
-    void destroy() {
-      for (int i = 0; i < moduleCount; i++) {
-        free((void *)moduleIds[i]);
-        free((void *)moduleNames[i]);
-      }
-      free((void *)moduleIds);
-      free((void *)moduleNames);
-    }
   } ModuleDetails;
+
+  typedef struct WrappedEvent {
+    Event event;
+    const char *pstrErr;
+  } WrappedEvent;
 
   typedef struct WrappedModuleDetails {
     ModuleDetails moduleDetails;
     const char *pstrErr;
-
-    void destroy() {
-      free((void *)pstrErr);
-      moduleDetails.destroy();
-    }
   } WrappedModuleDetails;
 
   WrappedModuleDetails GetModuleDetails(const char* minidump_filename);
@@ -152,4 +81,4 @@ extern "C" {
 }
 #endif
 
-#endif
+#endif // STACKWALK_WRAPPER_H
