@@ -293,7 +293,7 @@ Event getEvent(const ProcessState& process_state) {
   }
 
   App app = {
-    .duration = uptime, // TODO - Handle this being empty
+    .duration = uptime,
     .binaryArch = strdupWrapper(process_state.system_info()->cpu.c_str())
   };
 
@@ -450,7 +450,6 @@ WrappedEvent GetEventFromMinidump(const char* filename, const int symbol_path_co
 }
 
 // Frees the memory allocated by an Event
-// TODO - Check there are no memory leaks
 void FreeEvent(WrappedEvent* wrapped_event) {
   if (NULL != wrapped_event) {
     destroyWrappedEvent(wrapped_event);
@@ -458,7 +457,6 @@ void FreeEvent(WrappedEvent* wrapped_event) {
 }
 
 // Frees the memory allocated by the module details
-// TODO - Check there are no memory leaks
 void FreeModuleDetails(WrappedModuleDetails* wrapped_module_details) {
   if (NULL != wrapped_module_details) {
     destroyWrappedModuleDetails(wrapped_module_details);
