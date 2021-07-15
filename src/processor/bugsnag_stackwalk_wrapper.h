@@ -58,6 +58,7 @@ extern "C" {
 
   typedef struct ModuleDetails {
     int moduleCount;
+    char* mainModuleId;
     char** moduleIds;
     char** moduleNames;
   } ModuleDetails;
