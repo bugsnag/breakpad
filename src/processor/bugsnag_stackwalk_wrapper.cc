@@ -133,6 +133,8 @@ void destroyModuleDetails(void* self) {
   ModuleDetails* moduleDetails = (ModuleDetails*)self;
   if (NULL == moduleDetails) return;
 
+  freeAndInvalidate((void *)moduleDetails->mainModuleId);
+
   for (int i = 0; i < moduleDetails->moduleCount; i++) {
     freeAndInvalidate((void *)moduleDetails->moduleIds[i]);
     freeAndInvalidate((void *)moduleDetails->moduleNames[i]);
