@@ -133,6 +133,8 @@ void destroyModuleDetails(void* self) {
   ModuleDetails* moduleDetails = (ModuleDetails*)self;
   if (NULL == moduleDetails) return;
 
+  freeAndInvalidate((void *)moduleDetails->mainModuleId);
+
   for (int i = 0; i < moduleDetails->moduleCount; i++) {
     freeAndInvalidate((void *)moduleDetails->moduleIds[i]);
     freeAndInvalidate((void *)moduleDetails->moduleNames[i]);
@@ -332,6 +334,13 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
     }
 
     result.moduleDetails.moduleCount = module_list->module_count();
+
+    const MinidumpModule* mainModule = module_list->GetMainModule();
+    if (NULL == mainModule) {
+      throw std::runtime_error("failed to get main module");
+    }
+    string mainModuleId = mainModule->debug_identifier();
+    result.moduleDetails.mainModuleId = strdupWrapper(mainModuleId.c_str());
 
     char **module_ids = (char**)malloc(sizeof(char*) * module_list->module_count());
     if (NULL == module_ids) {
