@@ -42,7 +42,6 @@ char *strdupWrapper(const char *s) {
   return str;
 }
 
-
 // Calls free on passed pointer and sets it to NULL
 void freeAndInvalidate(void* p) {
   free((void *)p);
