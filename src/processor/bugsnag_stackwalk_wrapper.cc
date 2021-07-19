@@ -48,16 +48,6 @@ void freeAndInvalidate(void* p) {
   p = NULL;
 }
 
-// Gets the index of the thread that requested a dump be written
-int getErrorReportingThreadIndex(const ProcessState& process_state) {
-  int index = process_state.requesting_thread();
-  // If the dump thread was not available then default to the first available thread
-  if (index == -1) {
-    index = 0;
-  }
-  return index;
-}
-
 void destroyStackframe(void* self) {
   Stackframe* stackframe = (Stackframe*)self;
   if (NULL == stackframe) return;
@@ -158,7 +148,17 @@ void destroyWrappedModuleDetails(void* self) {
   destroyModuleDetails(&wrappedModuleDetails->moduleDetails);
 }
 
-// strips the `FRAME_TRUST_` from the trust enum
+// Gets the index of the thread that requested a dump be written
+int getErrorReportingThreadIndex(const ProcessState& process_state) {
+  int index = process_state.requesting_thread();
+  // If the dump thread was not available then default to the first available thread
+  if (index == -1) {
+    index = 0;
+  }
+  return index;
+}
+
+// Gets a friendly version of the stack frame trust value
 string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust)  {
   string trust = "";
   switch(stackFrameTrust) {
@@ -253,6 +253,7 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
   return s;
 }
 
+// Maps the thread information from a minidump into our Thread struct
 Thread* getThreads(const ProcessState& process_state) {
   int thread_count = process_state.threads()->size();
   int error_reporting_thread_index = getErrorReportingThreadIndex(process_state);
