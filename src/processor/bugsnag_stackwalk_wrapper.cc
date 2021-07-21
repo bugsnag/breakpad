@@ -33,9 +33,9 @@ using google_breakpad::scoped_ptr;
 using google_breakpad::SimpleSymbolSupplier;
 using google_breakpad::StackFrame;
 
-// Wraps strdup and throws runtime_error if memory allocation fails
-char* strdupWrapper(const char* s) {
-  char* str = strdup(s);
+// Wraps strdup and throws an error if memory allocation fails
+char* duplicate(const std::string& s) {
+  char* str = strdup(s.c_str());
   if (!str) {
     throw std::bad_alloc();
   }
@@ -236,16 +236,16 @@ static Stacktrace getStack(int thread_num, const CallStack* stack) {
       codeFile = frame->module->code_file();
     }
 
-    Stackframe f = {.filename = strdupWrapper(filename.c_str()),
-                    .method = strdupWrapper(method.c_str()),
-                    .frameAddress = strdupWrapper(frameAddress.c_str()),
-                    .loadAddress = strdupWrapper(loadAddress.c_str()),
-                    .moduleId = strdupWrapper(moduleId.c_str()),
-                    .moduleName = strdupWrapper(moduleName.c_str()),
-                    .returnAddress = strdupWrapper(returnAddress.c_str()),
-                    .symbolAddress = strdupWrapper(symbolAddress.c_str()),
-                    .codeFile = strdupWrapper(codeFile.c_str()),
-                    .trust = strdupWrapper(trust.c_str())};
+    Stackframe f = {.filename = duplicate(filename),
+                    .method = duplicate(method),
+                    .frameAddress = duplicate(frameAddress),
+                    .loadAddress = duplicate(loadAddress),
+                    .moduleId = duplicate(moduleId),
+                    .moduleName = duplicate(moduleName),
+                    .returnAddress = duplicate(returnAddress),
+                    .symbolAddress = duplicate(symbolAddress),
+                    .codeFile = duplicate(codeFile),
+                    .trust = duplicate(trust)};
     frames.push_back(f);
   }
 
@@ -284,12 +284,11 @@ Event getEvent(const ProcessState& process_state) {
   Stacktrace s = getStack(1, process_state.threads()->at(
                                  getErrorReportingThreadIndex(process_state)));
 
-  Exception e = {
-      .stacktrace = s,
-      .errorClass = strdupWrapper(process_state.crash_reason().c_str())};
+  Exception e = {.stacktrace = s,
+                 .errorClass = duplicate(process_state.crash_reason())};
   string crashAddress = HexString(process_state.crash_address());
   if (crashAddress != "") {
-    e.crashAddress = strdupWrapper(crashAddress.c_str());
+    e.crashAddress = duplicate(crashAddress);
   }
 
   int uptime = 0;
@@ -300,14 +299,12 @@ Event getEvent(const ProcessState& process_state) {
              process_state.process_create_time() * 1000;
   }
 
-  App app = {
-      .duration = uptime,
-      .binaryArch = strdupWrapper(process_state.system_info()->cpu.c_str())};
+  App app = {.duration = uptime,
+             .binaryArch = duplicate(process_state.system_info()->cpu)};
 
   Device device = {
-      .osName = strdupWrapper(process_state.system_info()->os.data()),
-      .osVersion =
-          strdupWrapper(process_state.system_info()->os_version.c_str())};
+      .osName = duplicate(process_state.system_info()->os.data()),
+      .osVersion = duplicate(process_state.system_info()->os_version)};
 
   int thread_count = process_state.threads()->size();
   Event returnEvent = {.threadCount = thread_count,
@@ -326,13 +323,13 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
   try {
     Minidump dump(minidump_filename);
     if (!dump.Read()) {
-      result.pstrErr = strdupWrapper("failed to read minidump");
+      result.pstrErr = duplicate("failed to read minidump");
       return result;
     }
 
     MinidumpModuleList* module_list = dump.GetModuleList();
     if (!module_list) {
-      result.pstrErr = strdupWrapper("failed to get module list");
+      result.pstrErr = duplicate("failed to get module list");
       return result;
     }
 
@@ -343,7 +340,7 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
       throw std::runtime_error("failed to get main module");
     }
     string mainModuleId = mainModule->debug_identifier();
-    result.moduleDetails.mainModuleId = strdupWrapper(mainModuleId.c_str());
+    result.moduleDetails.mainModuleId = duplicate(mainModuleId);
 
     char** module_ids =
         (char**)malloc(sizeof(char*) * module_list->module_count());
@@ -363,18 +360,18 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
       }
 
       string debug_identifier = module->debug_identifier();
-      module_ids[i] = strdupWrapper(debug_identifier.c_str());
+      module_ids[i] = duplicate(debug_identifier);
 
       string debug_file = PathnameStripper::File(module->debug_file());
-      module_names[i] = strdupWrapper(debug_file.c_str());
+      module_names[i] = duplicate(debug_file);
     };
     result.moduleDetails.moduleIds = module_ids;
     result.moduleDetails.moduleNames = module_names;
   } catch (const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
-    result.pstrErr = strdupWrapper(errMsg.c_str());
+    result.pstrErr = duplicate(errMsg);
   } catch (...) {
-    result.pstrErr = strdupWrapper("encountered unknown exception");
+    result.pstrErr = duplicate("encountered unknown exception");
   }
 
   return result;
@@ -453,7 +450,7 @@ WrappedEvent GetEventFromMinidump(const char* filename,
     if (process_result != google_breakpad::PROCESS_OK) {
       string errMsg = "failed to process minidump: " +
                       getFriendlyFailureReason(process_result);
-      result.pstrErr = strdupWrapper(errMsg.c_str());
+      result.pstrErr = duplicate(errMsg);
       return result;
     }
 
@@ -461,9 +458,9 @@ WrappedEvent GetEventFromMinidump(const char* filename,
     result.event = getEvent(process_state);
   } catch (const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
-    result.pstrErr = strdupWrapper(errMsg.c_str());
+    result.pstrErr = duplicate(errMsg);
   } catch (...) {
-    result.pstrErr = strdupWrapper("encountered unknown exception");
+    result.pstrErr = duplicate("encountered unknown exception");
   }
 
   return result;
