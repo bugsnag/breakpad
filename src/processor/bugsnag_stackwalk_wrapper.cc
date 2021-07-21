@@ -36,21 +36,21 @@ using google_breakpad::StackFrame;
 // Wraps strdup and throws runtime_error if memory allocation fails
 char* strdupWrapper(const char* s) {
   char* str = strdup(s);
-  if (NULL == str) {
+  if (!str) {
     throw std::runtime_error("Memory allocation error");
   }
   return str;
 }
 
-// Calls free on passed pointer and sets it to NULL
+// Calls free on passed pointer and sets it to nullptr
 void freeAndInvalidate(void* p) {
   free((void*)p);
-  p = NULL;
+  p = nullptr;
 }
 
 void destroyStackframe(void* self) {
   Stackframe* stackframe = (Stackframe*)self;
-  if (NULL == stackframe)
+  if (!stackframe)
     return;
 
   freeAndInvalidate((void*)stackframe->filename);
@@ -67,7 +67,7 @@ void destroyStackframe(void* self) {
 
 void destroyStacktrace(void* self) {
   Stacktrace* stacktrace = (Stacktrace*)self;
-  if (NULL == stacktrace)
+  if (!stacktrace)
     return;
 
   for (int i = 0; i < stacktrace->frameCount; ++i) {
@@ -78,7 +78,7 @@ void destroyStacktrace(void* self) {
 
 void destroyException(void* self) {
   Exception* exception = (Exception*)self;
-  if (NULL == exception)
+  if (!exception)
     return;
 
   freeAndInvalidate((void*)exception->errorClass);
@@ -88,7 +88,7 @@ void destroyException(void* self) {
 
 void destroyApp(void* self) {
   App* app = (App*)self;
-  if (NULL == app)
+  if (!app)
     return;
 
   freeAndInvalidate((void*)app->binaryArch);
@@ -96,7 +96,7 @@ void destroyApp(void* self) {
 
 void destroyDevice(void* self) {
   Device* device = (Device*)self;
-  if (NULL == device)
+  if (!device)
     return;
 
   freeAndInvalidate((void*)device->osName);
@@ -105,7 +105,7 @@ void destroyDevice(void* self) {
 
 void destroyThread(void* self) {
   Thread* thread = (Thread*)self;
-  if (NULL == thread)
+  if (!thread)
     return;
 
   destroyStacktrace(&thread->stacktrace);
@@ -113,7 +113,7 @@ void destroyThread(void* self) {
 
 void destroyEvent(void* self) {
   Event* event = (Event*)self;
-  if (NULL == event)
+  if (!event)
     return;
 
   destroyApp(&event->app);
@@ -127,7 +127,7 @@ void destroyEvent(void* self) {
 
 void destroyModuleDetails(void* self) {
   ModuleDetails* moduleDetails = (ModuleDetails*)self;
-  if (NULL == moduleDetails)
+  if (!moduleDetails)
     return;
 
   freeAndInvalidate((void*)moduleDetails->mainModuleId);
@@ -142,7 +142,7 @@ void destroyModuleDetails(void* self) {
 
 void destroyWrappedEvent(void* self) {
   WrappedEvent* wrappedEvent = (WrappedEvent*)self;
-  if (NULL == wrappedEvent)
+  if (!wrappedEvent)
     return;
 
   freeAndInvalidate((void*)wrappedEvent->pstrErr);
@@ -151,7 +151,7 @@ void destroyWrappedEvent(void* self) {
 
 void destroyWrappedModuleDetails(void* self) {
   WrappedModuleDetails* wrappedModuleDetails = (WrappedModuleDetails*)self;
-  if (NULL == wrappedModuleDetails)
+  if (!wrappedModuleDetails)
     return;
 
   freeAndInvalidate((void*)wrappedModuleDetails->pstrErr);
@@ -209,7 +209,7 @@ static Stacktrace getStack(int thread_num, const CallStack* stack) {
 
   for (int frame_index = 0; frame_index < frame_count; ++frame_index) {
     const StackFrame* frame = stack->frames()->at(frame_index);
-    if (NULL == frame) {
+    if (!frame) {
       throw std::runtime_error("Bad frame index");
     }
 
@@ -339,7 +339,7 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
     result.moduleDetails.moduleCount = module_list->module_count();
 
     const MinidumpModule* mainModule = module_list->GetMainModule();
-    if (NULL == mainModule) {
+    if (!mainModule) {
       throw std::runtime_error("failed to get main module");
     }
     string mainModuleId = mainModule->debug_identifier();
@@ -347,18 +347,18 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
 
     char** module_ids =
         (char**)malloc(sizeof(char*) * module_list->module_count());
-    if (NULL == module_ids) {
+    if (!module_ids) {
       throw std::runtime_error("Memory allocation error");
     }
     char** module_names =
         (char**)malloc(sizeof(char*) * module_list->module_count());
-    if (NULL == module_names) {
+    if (!module_names) {
       throw std::runtime_error("Memory allocation error");
     }
 
     for (unsigned int i = 0; i < module_list->module_count(); i++) {
       const MinidumpModule* module = module_list->GetModuleAtIndex(i);
-      if (NULL == module) {
+      if (!module) {
         throw std::runtime_error("Bad module index");
       }
 
@@ -471,14 +471,14 @@ WrappedEvent GetEventFromMinidump(const char* filename,
 
 // Frees the memory allocated by an Event
 void FreeEvent(WrappedEvent* wrapped_event) {
-  if (NULL != wrapped_event) {
+  if (wrapped_event) {
     destroyWrappedEvent(wrapped_event);
   }
 }
 
 // Frees the memory allocated by the module details
 void FreeModuleDetails(WrappedModuleDetails* wrapped_module_details) {
-  if (NULL != wrapped_module_details) {
+  if (wrapped_module_details) {
     destroyWrappedModuleDetails(wrapped_module_details);
   }
 }
