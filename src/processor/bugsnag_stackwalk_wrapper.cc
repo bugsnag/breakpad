@@ -183,7 +183,7 @@ string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust) {
 }
 
 // Maps the stacktrace information from a minidump into our Stacktrace struct
-static Stacktrace getStack(int thread_num, const CallStack* stack) {
+static Stacktrace getStack(const CallStack* stack) {
   int frame_count = stack->frames()->size();
 
   std::vector<Stackframe> frames;
@@ -253,7 +253,7 @@ Thread* getThreads(const ProcessState& process_state) {
     int thread_id = thread->tid();
     Thread t = {.id = thread_id,
                 .errorReportingThread = (i == error_reporting_thread_index),
-                .stacktrace = getStack(i, thread)};
+                .stacktrace = getStack(thread)};
     threads[i] = t;
   }
 
@@ -262,8 +262,8 @@ Thread* getThreads(const ProcessState& process_state) {
 
 // Maps the information from a minidump into our Event struct
 Event getEvent(const ProcessState& process_state) {
-  Stacktrace s = getStack(1, process_state.threads()->at(
-                                 getErrorReportingThreadIndex(process_state)));
+  Stacktrace s = getStack(
+      process_state.threads()->at(getErrorReportingThreadIndex(process_state)));
 
   Exception e = {.stacktrace = s,
                  .errorClass = duplicate(process_state.crash_reason())};
@@ -364,7 +364,7 @@ string getFriendlyFailureReason(ProcessResult process_result) {
     case google_breakpad::PROCESS_ERROR_MINIDUMP_NOT_FOUND:
       return "minidump not found";
     case google_breakpad::PROCESS_ERROR_NO_MINIDUMP_HEADER:
-      return"no minidump header";
+      return "no minidump header";
     case google_breakpad::PROCESS_ERROR_NO_THREAD_LIST:
       return "no thread list";
     case google_breakpad::PROCESS_ERROR_GETTING_THREAD:
