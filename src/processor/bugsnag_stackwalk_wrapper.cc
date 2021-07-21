@@ -185,9 +185,7 @@ string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust) {
 // Maps the stacktrace information from a minidump into our Stacktrace struct
 static Stacktrace getStack(const CallStack* stack) {
   int frame_count = stack->frames()->size();
-
-  std::vector<Stackframe> frames;
-
+  Stackframe* stackframes = new Stackframe[frame_count];
   for (int frame_index = 0; frame_index < frame_count; ++frame_index) {
     const StackFrame* frame = stack->frames()->at(frame_index);
     if (!frame) {
@@ -227,12 +225,7 @@ static Stacktrace getStack(const CallStack* stack) {
                     .symbolAddress = duplicate(symbolAddress),
                     .codeFile = duplicate(codeFile),
                     .trust = duplicate(trust)};
-    frames.push_back(f);
-  }
-
-  Stackframe* stackframes = new Stackframe[frame_count];
-  for (int frame_index = 0; frame_index < frame_count; ++frame_index) {
-    stackframes[frame_index] = frames.at(frame_index);
+    stackframes[frame_index] = f;
   }
 
   Stacktrace s = {.frameCount = frame_count, .frames = stackframes};
