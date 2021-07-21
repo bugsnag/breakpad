@@ -37,7 +37,7 @@ using google_breakpad::StackFrame;
 char* strdupWrapper(const char* s) {
   char* str = strdup(s);
   if (!str) {
-    throw std::runtime_error("Memory allocation error");
+    throw std::bad_alloc();
   }
   return str;
 }
@@ -348,12 +348,12 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
     char** module_ids =
         (char**)malloc(sizeof(char*) * module_list->module_count());
     if (!module_ids) {
-      throw std::runtime_error("Memory allocation error");
+      throw std::bad_alloc();
     }
     char** module_names =
         (char**)malloc(sizeof(char*) * module_list->module_count());
     if (!module_names) {
-      throw std::runtime_error("Memory allocation error");
+      throw std::bad_alloc();
     }
 
     for (unsigned int i = 0; i < module_list->module_count(); i++) {
