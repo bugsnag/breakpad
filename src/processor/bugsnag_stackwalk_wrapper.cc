@@ -4,16 +4,16 @@
 #include "logging.h"
 #include "simple_symbol_supplier.h"
 
-#include <stdexcept>
-#include <limits>
 #include <string.h>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "google_breakpad/processor/basic_source_line_resolver.h"
+#include "google_breakpad/processor/call_stack.h"
 #include "google_breakpad/processor/minidump_processor.h"
 #include "google_breakpad/processor/process_state.h"
-#include "google_breakpad/processor/call_stack.h"
 #include "google_breakpad/processor/stack_frame_cpu.h"
 #include "processor/pathname_stripper.h"
 
@@ -26,16 +26,16 @@ using google_breakpad::MinidumpModule;
 using google_breakpad::MinidumpModuleList;
 using google_breakpad::MinidumpProcessor;
 using google_breakpad::MinidumpThreadList;
+using google_breakpad::PathnameStripper;
 using google_breakpad::ProcessResult;
 using google_breakpad::ProcessState;
 using google_breakpad::scoped_ptr;
 using google_breakpad::SimpleSymbolSupplier;
 using google_breakpad::StackFrame;
-using google_breakpad::PathnameStripper;
 
 // Wraps strdup and throws runtime_error if memory allocation fails
-char *strdupWrapper(const char *s) {
-  char *str = strdup(s);
+char* strdupWrapper(const char* s) {
+  char* str = strdup(s);
   if (NULL == str) {
     throw std::runtime_error("Memory allocation error");
   }
@@ -44,29 +44,31 @@ char *strdupWrapper(const char *s) {
 
 // Calls free on passed pointer and sets it to NULL
 void freeAndInvalidate(void* p) {
-  free((void *)p);
+  free((void*)p);
   p = NULL;
 }
 
 void destroyStackframe(void* self) {
   Stackframe* stackframe = (Stackframe*)self;
-  if (NULL == stackframe) return;
+  if (NULL == stackframe)
+    return;
 
-  freeAndInvalidate((void *)stackframe->filename);
-  freeAndInvalidate((void *)stackframe->method);
-  freeAndInvalidate((void *)stackframe->frameAddress);
-  freeAndInvalidate((void *)stackframe->loadAddress);
-  freeAndInvalidate((void *)stackframe->moduleId);
-  freeAndInvalidate((void *)stackframe->moduleName);
-  freeAndInvalidate((void *)stackframe->returnAddress);
-  freeAndInvalidate((void *)stackframe->symbolAddress);
-  freeAndInvalidate((void *)stackframe->codeFile);
-  freeAndInvalidate((void *)stackframe->trust);
+  freeAndInvalidate((void*)stackframe->filename);
+  freeAndInvalidate((void*)stackframe->method);
+  freeAndInvalidate((void*)stackframe->frameAddress);
+  freeAndInvalidate((void*)stackframe->loadAddress);
+  freeAndInvalidate((void*)stackframe->moduleId);
+  freeAndInvalidate((void*)stackframe->moduleName);
+  freeAndInvalidate((void*)stackframe->returnAddress);
+  freeAndInvalidate((void*)stackframe->symbolAddress);
+  freeAndInvalidate((void*)stackframe->codeFile);
+  freeAndInvalidate((void*)stackframe->trust);
 }
 
 void destroyStacktrace(void* self) {
   Stacktrace* stacktrace = (Stacktrace*)self;
-  if (NULL == stacktrace) return;
+  if (NULL == stacktrace)
+    return;
 
   for (int i = 0; i < stacktrace->frameCount; ++i) {
     destroyStackframe(&stacktrace->frames[i]);
@@ -76,38 +78,43 @@ void destroyStacktrace(void* self) {
 
 void destroyException(void* self) {
   Exception* exception = (Exception*)self;
-  if (NULL == exception) return;
+  if (NULL == exception)
+    return;
 
-  freeAndInvalidate((void *)exception->errorClass);
-  freeAndInvalidate((void *)exception->crashAddress);
+  freeAndInvalidate((void*)exception->errorClass);
+  freeAndInvalidate((void*)exception->crashAddress);
   destroyStacktrace(&exception->stacktrace);
 }
 
 void destroyApp(void* self) {
   App* app = (App*)self;
-  if (NULL == app) return;
+  if (NULL == app)
+    return;
 
-  freeAndInvalidate((void *)app->binaryArch);
+  freeAndInvalidate((void*)app->binaryArch);
 }
 
 void destroyDevice(void* self) {
   Device* device = (Device*)self;
-  if (NULL == device) return;
+  if (NULL == device)
+    return;
 
-  freeAndInvalidate((void *)device->osName);
-  freeAndInvalidate((void *)device->osVersion);
+  freeAndInvalidate((void*)device->osName);
+  freeAndInvalidate((void*)device->osVersion);
 }
 
 void destroyThread(void* self) {
   Thread* thread = (Thread*)self;
-  if (NULL == thread) return;
+  if (NULL == thread)
+    return;
 
   destroyStacktrace(&thread->stacktrace);
 }
 
 void destroyEvent(void* self) {
   Event* event = (Event*)self;
-  if (NULL == event) return;
+  if (NULL == event)
+    return;
 
   destroyApp(&event->app);
   destroyDevice(&event->device);
@@ -120,38 +127,42 @@ void destroyEvent(void* self) {
 
 void destroyModuleDetails(void* self) {
   ModuleDetails* moduleDetails = (ModuleDetails*)self;
-  if (NULL == moduleDetails) return;
+  if (NULL == moduleDetails)
+    return;
 
-  freeAndInvalidate((void *)moduleDetails->mainModuleId);
+  freeAndInvalidate((void*)moduleDetails->mainModuleId);
 
   for (int i = 0; i < moduleDetails->moduleCount; i++) {
-    freeAndInvalidate((void *)moduleDetails->moduleIds[i]);
-    freeAndInvalidate((void *)moduleDetails->moduleNames[i]);
+    freeAndInvalidate((void*)moduleDetails->moduleIds[i]);
+    freeAndInvalidate((void*)moduleDetails->moduleNames[i]);
   }
-  freeAndInvalidate((void *)moduleDetails->moduleIds);
-  freeAndInvalidate((void *)moduleDetails->moduleNames);
+  freeAndInvalidate((void*)moduleDetails->moduleIds);
+  freeAndInvalidate((void*)moduleDetails->moduleNames);
 }
 
 void destroyWrappedEvent(void* self) {
   WrappedEvent* wrappedEvent = (WrappedEvent*)self;
-  if (NULL == wrappedEvent) return;
+  if (NULL == wrappedEvent)
+    return;
 
-  freeAndInvalidate((void *)wrappedEvent->pstrErr);
+  freeAndInvalidate((void*)wrappedEvent->pstrErr);
   destroyEvent(&wrappedEvent->event);
 }
 
 void destroyWrappedModuleDetails(void* self) {
   WrappedModuleDetails* wrappedModuleDetails = (WrappedModuleDetails*)self;
-  if (NULL == wrappedModuleDetails) return;
+  if (NULL == wrappedModuleDetails)
+    return;
 
-  freeAndInvalidate((void *)wrappedModuleDetails->pstrErr);
+  freeAndInvalidate((void*)wrappedModuleDetails->pstrErr);
   destroyModuleDetails(&wrappedModuleDetails->moduleDetails);
 }
 
 // Gets the index of the thread that requested a dump be written
 int getErrorReportingThreadIndex(const ProcessState& process_state) {
   int index = process_state.requesting_thread();
-  // If the dump thread was not available then default to the first available thread
+  // If the dump thread was not available then default to the first available
+  // thread
   if (index == -1) {
     index = 0;
   }
@@ -159,9 +170,9 @@ int getErrorReportingThreadIndex(const ProcessState& process_state) {
 }
 
 // Gets a friendly version of the stack frame trust value
-string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust)  {
+string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust) {
   string trust = "";
-  switch(stackFrameTrust) {
+  switch (stackFrameTrust) {
     case StackFrame::FRAME_TRUST_NONE:
       trust = "NONE";
       break;
@@ -191,7 +202,7 @@ string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust)  {
 }
 
 // Maps the stacktrace information from a minidump into our Stacktrace struct
-static Stacktrace getStack(int thread_num, const CallStack* stack)  {
+static Stacktrace getStack(int thread_num, const CallStack* stack) {
   int frame_count = stack->frames()->size();
 
   std::vector<Stackframe> frames;
@@ -224,19 +235,17 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
       moduleName = frame->module->debug_file();
       codeFile = frame->module->code_file();
     }
-    
-    Stackframe f = {
-      .filename = strdupWrapper(filename.c_str()),
-      .method = strdupWrapper(method.c_str()),
-      .frameAddress = strdupWrapper(frameAddress.c_str()),
-      .loadAddress = strdupWrapper(loadAddress.c_str()),
-      .moduleId = strdupWrapper(moduleId.c_str()),
-      .moduleName = strdupWrapper(moduleName.c_str()),
-      .returnAddress = strdupWrapper(returnAddress.c_str()),
-      .symbolAddress = strdupWrapper(symbolAddress.c_str()),
-      .codeFile = strdupWrapper(codeFile.c_str()),
-      .trust = strdupWrapper(trust.c_str())
-    };
+
+    Stackframe f = {.filename = strdupWrapper(filename.c_str()),
+                    .method = strdupWrapper(method.c_str()),
+                    .frameAddress = strdupWrapper(frameAddress.c_str()),
+                    .loadAddress = strdupWrapper(loadAddress.c_str()),
+                    .moduleId = strdupWrapper(moduleId.c_str()),
+                    .moduleName = strdupWrapper(moduleName.c_str()),
+                    .returnAddress = strdupWrapper(returnAddress.c_str()),
+                    .symbolAddress = strdupWrapper(symbolAddress.c_str()),
+                    .codeFile = strdupWrapper(codeFile.c_str()),
+                    .trust = strdupWrapper(trust.c_str())};
     frames.push_back(f);
   }
 
@@ -245,10 +254,7 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
     stackframes[frame_index] = frames.at(frame_index);
   }
 
-  Stacktrace s = {
-    .frameCount = frame_count,
-    .frames = stackframes
-  };
+  Stacktrace s = {.frameCount = frame_count, .frames = stackframes};
 
   return s;
 }
@@ -256,19 +262,18 @@ static Stacktrace getStack(int thread_num, const CallStack* stack)  {
 // Maps the thread information from a minidump into our Thread struct
 Thread* getThreads(const ProcessState& process_state) {
   int thread_count = process_state.threads()->size();
-  int error_reporting_thread_index = getErrorReportingThreadIndex(process_state);
+  int error_reporting_thread_index =
+      getErrorReportingThreadIndex(process_state);
 
   Thread* threads = new Thread[thread_count];
 
   for (int i = 0; i < thread_count; i++) {
-      const CallStack* thread = process_state.threads()->at(i);
-      int thread_id = thread->tid();
-      Thread t = {
-        .id = thread_id,
-        .errorReportingThread = (i == error_reporting_thread_index),
-        .stacktrace = getStack(i, thread)
-      };
-      threads[i] = t;
+    const CallStack* thread = process_state.threads()->at(i);
+    int thread_id = thread->tid();
+    Thread t = {.id = thread_id,
+                .errorReportingThread = (i == error_reporting_thread_index),
+                .stacktrace = getStack(i, thread)};
+    threads[i] = t;
   }
 
   return threads;
@@ -276,12 +281,12 @@ Thread* getThreads(const ProcessState& process_state) {
 
 // Maps the information from a minidump into our Event struct
 Event getEvent(const ProcessState& process_state) {
-  Stacktrace s = getStack(1, process_state.threads()->at(getErrorReportingThreadIndex(process_state)));
+  Stacktrace s = getStack(1, process_state.threads()->at(
+                                 getErrorReportingThreadIndex(process_state)));
 
   Exception e = {
-    .stacktrace = s,
-    .errorClass = strdupWrapper(process_state.crash_reason().c_str())
-  };
+      .stacktrace = s,
+      .errorClass = strdupWrapper(process_state.crash_reason().c_str())};
   string crashAddress = HexString(process_state.crash_address());
   if (crashAddress != "") {
     e.crashAddress = strdupWrapper(crashAddress.c_str());
@@ -291,27 +296,25 @@ Event getEvent(const ProcessState& process_state) {
   if (process_state.time_date_stamp() != 0 &&
       process_state.process_create_time() != 0 &&
       process_state.time_date_stamp() >= process_state.process_create_time()) {
-    uptime = process_state.time_date_stamp() - process_state.process_create_time() * 1000;
+    uptime = process_state.time_date_stamp() -
+             process_state.process_create_time() * 1000;
   }
 
   App app = {
-    .duration = uptime,
-    .binaryArch = strdupWrapper(process_state.system_info()->cpu.c_str())
-  };
+      .duration = uptime,
+      .binaryArch = strdupWrapper(process_state.system_info()->cpu.c_str())};
 
   Device device = {
-    .osName = strdupWrapper(process_state.system_info()->os.data()),
-    .osVersion = strdupWrapper(process_state.system_info()->os_version.c_str())
-  };
-  
+      .osName = strdupWrapper(process_state.system_info()->os.data()),
+      .osVersion =
+          strdupWrapper(process_state.system_info()->os_version.c_str())};
+
   int thread_count = process_state.threads()->size();
-  Event returnEvent = {
-    .threadCount = thread_count,
-    .exception = e,
-    .app = app,
-    .device = device,
-    .threads = getThreads(process_state)
-  };
+  Event returnEvent = {.threadCount = thread_count,
+                       .exception = e,
+                       .app = app,
+                       .device = device,
+                       .threads = getThreads(process_state)};
 
   return returnEvent;
 }
@@ -342,11 +345,13 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
     string mainModuleId = mainModule->debug_identifier();
     result.moduleDetails.mainModuleId = strdupWrapper(mainModuleId.c_str());
 
-    char **module_ids = (char**)malloc(sizeof(char*) * module_list->module_count());
+    char** module_ids =
+        (char**)malloc(sizeof(char*) * module_list->module_count());
     if (NULL == module_ids) {
       throw std::runtime_error("Memory allocation error");
     }
-    char **module_names = (char**)malloc(sizeof(char*) * module_list->module_count());
+    char** module_names =
+        (char**)malloc(sizeof(char*) * module_list->module_count());
     if (NULL == module_names) {
       throw std::runtime_error("Memory allocation error");
     }
@@ -365,10 +370,10 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
     };
     result.moduleDetails.moduleIds = module_ids;
     result.moduleDetails.moduleNames = module_names;
-  } catch(const std::exception& ex) {
+  } catch (const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
     result.pstrErr = strdupWrapper(errMsg.c_str());
-  } catch(...) {
+  } catch (...) {
     result.pstrErr = strdupWrapper("encountered unknown exception");
   }
 
@@ -379,7 +384,7 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
 string getFriendlyFailureReason(ProcessResult process_result) {
   string reason = "";
 
-  switch(process_result) {
+  switch (process_result) {
     case google_breakpad::PROCESS_ERROR_MINIDUMP_NOT_FOUND:
       reason = "minidump not found";
       break;
@@ -409,12 +414,16 @@ string getFriendlyFailureReason(ProcessResult process_result) {
 }
 
 // Gets an Event payload from the minidump.
-// Note: Logic for parsing the minidump is based on PrintMinidumpProcess in minidump_stackwalk.cc
-WrappedEvent GetEventFromMinidump(const char* filename, const int symbol_path_count, const char** symbol_paths) {
+// Note: Logic for parsing the minidump is based on PrintMinidumpProcess in
+// minidump_stackwalk.cc
+WrappedEvent GetEventFromMinidump(const char* filename,
+                                  const int symbol_path_count,
+                                  const char** symbol_paths) {
   WrappedEvent result = {{0}};
 
   try {
-    // Apply a symbol supplier if we've been given one or more symbol paths (to allow the stack data to be used when walking the stacktrace)
+    // Apply a symbol supplier if we've been given one or more symbol paths (to
+    // allow the stack data to be used when walking the stacktrace)
     std::vector<string> supplied_symbol_paths;
     scoped_ptr<SimpleSymbolSupplier> symbol_supplier;
     for (int i = 0; i < symbol_path_count; i++) {
@@ -430,7 +439,7 @@ WrappedEvent GetEventFromMinidump(const char* filename, const int symbol_path_co
     // Increase the maximum number of threads and regions.
     MinidumpThreadList::set_max_threads(std::numeric_limits<uint32_t>::max());
     MinidumpMemoryList::set_max_regions(std::numeric_limits<uint32_t>::max());
-    
+
     // Process the minidump.
     Minidump dump(filename);
     if (!dump.Read()) {
@@ -439,19 +448,21 @@ WrappedEvent GetEventFromMinidump(const char* filename, const int symbol_path_co
     }
 
     ProcessState process_state;
-    ProcessResult process_result = minidump_processor.Process(&dump, &process_state);
+    ProcessResult process_result =
+        minidump_processor.Process(&dump, &process_state);
     if (process_result != google_breakpad::PROCESS_OK) {
-      string errMsg = "failed to process minidump: " + getFriendlyFailureReason(process_result);
+      string errMsg = "failed to process minidump: " +
+                      getFriendlyFailureReason(process_result);
       result.pstrErr = strdupWrapper(errMsg.c_str());
       return result;
     }
 
     // Map the process state to an Event struct
     result.event = getEvent(process_state);
-  } catch(const std::exception& ex) {
+  } catch (const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
     result.pstrErr = strdupWrapper(errMsg.c_str());
-  } catch(...) {
+  } catch (...) {
     result.pstrErr = strdupWrapper("encountered unknown exception");
   }
 
