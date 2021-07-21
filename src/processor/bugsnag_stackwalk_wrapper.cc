@@ -65,8 +65,7 @@ void destroyStackframe(void* self) {
   freeAndInvalidate((void*)stackframe->trust);
 }
 
-void destroyStacktrace(void* self) {
-  Stacktrace* stacktrace = (Stacktrace*)self;
+void destroyStacktrace(Stacktrace* stacktrace) {
   if (!stacktrace)
     return;
 
@@ -76,8 +75,7 @@ void destroyStacktrace(void* self) {
   freeAndInvalidate(stacktrace->frames);
 }
 
-void destroyException(void* self) {
-  Exception* exception = (Exception*)self;
+void destroyException(Exception* exception) {
   if (!exception)
     return;
 
@@ -86,16 +84,14 @@ void destroyException(void* self) {
   destroyStacktrace(&exception->stacktrace);
 }
 
-void destroyApp(void* self) {
-  App* app = (App*)self;
+void destroyApp(App* app) {
   if (!app)
     return;
 
   freeAndInvalidate((void*)app->binaryArch);
 }
 
-void destroyDevice(void* self) {
-  Device* device = (Device*)self;
+void destroyDevice(Device* device) {
   if (!device)
     return;
 
@@ -103,16 +99,14 @@ void destroyDevice(void* self) {
   freeAndInvalidate((void*)device->osVersion);
 }
 
-void destroyThread(void* self) {
-  Thread* thread = (Thread*)self;
+void destroyThread(Thread* thread) {
   if (!thread)
     return;
 
   destroyStacktrace(&thread->stacktrace);
 }
 
-void destroyEvent(void* self) {
-  Event* event = (Event*)self;
+void destroyEvent(Event* event) {
   if (!event)
     return;
 
@@ -125,8 +119,7 @@ void destroyEvent(void* self) {
   freeAndInvalidate(event->threads);
 }
 
-void destroyModuleDetails(void* self) {
-  ModuleDetails* moduleDetails = (ModuleDetails*)self;
+void destroyModuleDetails(ModuleDetails* moduleDetails) {
   if (!moduleDetails)
     return;
 
@@ -140,8 +133,7 @@ void destroyModuleDetails(void* self) {
   freeAndInvalidate((void*)moduleDetails->moduleNames);
 }
 
-void destroyWrappedEvent(void* self) {
-  WrappedEvent* wrappedEvent = (WrappedEvent*)self;
+void destroyWrappedEvent(WrappedEvent* wrappedEvent) {
   if (!wrappedEvent)
     return;
 
@@ -149,8 +141,7 @@ void destroyWrappedEvent(void* self) {
   destroyEvent(&wrappedEvent->event);
 }
 
-void destroyWrappedModuleDetails(void* self) {
-  WrappedModuleDetails* wrappedModuleDetails = (WrappedModuleDetails*)self;
+void destroyWrappedModuleDetails(WrappedModuleDetails* wrappedModuleDetails) {
   if (!wrappedModuleDetails)
     return;
 
