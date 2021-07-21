@@ -162,34 +162,24 @@ int getErrorReportingThreadIndex(const ProcessState& process_state) {
 
 // Gets a friendly version of the stack frame trust value
 string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust) {
-  string trust = "";
   switch (stackFrameTrust) {
     case StackFrame::FRAME_TRUST_NONE:
-      trust = "NONE";
-      break;
+      return "NONE";
     case StackFrame::FRAME_TRUST_SCAN:
-      trust = "SCAN";
-      break;
+      return "SCAN";
     case StackFrame::FRAME_TRUST_CFI_SCAN:
-      trust = "CFI_SCAN";
-      break;
+      return "CFI_SCAN";
     case StackFrame::FRAME_TRUST_FP:
-      trust = "FP";
-      break;
+      return "FP";
     case StackFrame::FRAME_TRUST_CFI:
-      trust = "CFI";
-      break;
+      return "CFI";
     case StackFrame::FRAME_TRUST_PREWALKED:
-      trust = "PREWALKED";
-      break;
+      return "PREWALKED";
     case StackFrame::FRAME_TRUST_CONTEXT:
-      trust = "CONTEXT";
-      break;
+      return "CONTEXT";
     default:
-      break;
+      return "";
   }
-
-  return trust;
 }
 
 // Maps the stacktrace information from a minidump into our Stacktrace struct
@@ -370,35 +360,24 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
 
 // Gets a friendly version of a minidump processing failure reason
 string getFriendlyFailureReason(ProcessResult process_result) {
-  string reason = "";
-
   switch (process_result) {
     case google_breakpad::PROCESS_ERROR_MINIDUMP_NOT_FOUND:
-      reason = "minidump not found";
-      break;
+      return "minidump not found";
     case google_breakpad::PROCESS_ERROR_NO_MINIDUMP_HEADER:
-      reason = "no minidump header";
-      break;
+      return"no minidump header";
     case google_breakpad::PROCESS_ERROR_NO_THREAD_LIST:
-      reason = "no thread list";
-      break;
+      return "no thread list";
     case google_breakpad::PROCESS_ERROR_GETTING_THREAD:
-      reason = "error getting thread";
-      break;
+      return "error getting thread";
     case google_breakpad::PROCESS_ERROR_GETTING_THREAD_ID:
-      reason = "error getting thread ID";
-      break;
+      return "error getting thread ID";
     case google_breakpad::PROCESS_ERROR_DUPLICATE_REQUESTING_THREADS:
-      reason = "more than one requesting thread";
-      break;
+      return "more than one requesting thread";
     case google_breakpad::PROCESS_SYMBOL_SUPPLIER_INTERRUPTED:
-      reason = "dump processing interrupted by symbol supplier";
-      break;
+      return "dump processing interrupted by symbol supplier";
     default:
-      reason = "unknown failure reason";
+      return "unknown failure reason";
   }
-
-  return reason;
 }
 
 // Gets an Event payload from the minidump.
