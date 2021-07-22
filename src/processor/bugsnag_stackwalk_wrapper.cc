@@ -43,9 +43,9 @@ char* duplicate(const std::string& s) {
 }
 
 // Calls free on passed pointer and sets it to nullptr
-void freeAndInvalidate(void* p) {
-  free((void*)p);
-  p = nullptr;
+void freeAndInvalidate(void** p) {
+  free((void*)*p);
+  *p = nullptr;
 }
 
 void destroyStackframe(void* self) {
@@ -53,16 +53,16 @@ void destroyStackframe(void* self) {
   if (!stackframe)
     return;
 
-  freeAndInvalidate((void*)stackframe->filename);
-  freeAndInvalidate((void*)stackframe->method);
-  freeAndInvalidate((void*)stackframe->frameAddress);
-  freeAndInvalidate((void*)stackframe->loadAddress);
-  freeAndInvalidate((void*)stackframe->moduleId);
-  freeAndInvalidate((void*)stackframe->moduleName);
-  freeAndInvalidate((void*)stackframe->returnAddress);
-  freeAndInvalidate((void*)stackframe->symbolAddress);
-  freeAndInvalidate((void*)stackframe->codeFile);
-  freeAndInvalidate((void*)stackframe->trust);
+  freeAndInvalidate((void**)&stackframe->filename);
+  freeAndInvalidate((void**)&stackframe->method);
+  freeAndInvalidate((void**)&stackframe->frameAddress);
+  freeAndInvalidate((void**)&stackframe->loadAddress);
+  freeAndInvalidate((void**)&stackframe->moduleId);
+  freeAndInvalidate((void**)&stackframe->moduleName);
+  freeAndInvalidate((void**)&stackframe->returnAddress);
+  freeAndInvalidate((void**)&stackframe->symbolAddress);
+  freeAndInvalidate((void**)&stackframe->codeFile);
+  freeAndInvalidate((void**)&stackframe->trust);
 }
 
 void destroyStacktrace(Stacktrace* stacktrace) {
@@ -72,15 +72,15 @@ void destroyStacktrace(Stacktrace* stacktrace) {
   for (int i = 0; i < stacktrace->frameCount; ++i) {
     destroyStackframe(&stacktrace->frames[i]);
   }
-  freeAndInvalidate(stacktrace->frames);
+  freeAndInvalidate((void**)&stacktrace->frames);
 }
 
 void destroyException(Exception* exception) {
   if (!exception)
     return;
 
-  freeAndInvalidate((void*)exception->errorClass);
-  freeAndInvalidate((void*)exception->crashAddress);
+  freeAndInvalidate((void**)&exception->errorClass);
+  freeAndInvalidate((void**)&exception->crashAddress);
   destroyStacktrace(&exception->stacktrace);
 }
 
@@ -88,15 +88,15 @@ void destroyApp(App* app) {
   if (!app)
     return;
 
-  freeAndInvalidate((void*)app->binaryArch);
+  freeAndInvalidate((void**)&app->binaryArch);
 }
 
 void destroyDevice(Device* device) {
   if (!device)
     return;
 
-  freeAndInvalidate((void*)device->osName);
-  freeAndInvalidate((void*)device->osVersion);
+  freeAndInvalidate((void**)&device->osName);
+  freeAndInvalidate((void**)&device->osVersion);
 }
 
 void destroyThread(Thread* thread) {
@@ -116,28 +116,28 @@ void destroyEvent(Event* event) {
   for (int i = 0; i < event->threadCount; ++i) {
     destroyThread(&event->threads[i]);
   }
-  freeAndInvalidate(event->threads);
+  freeAndInvalidate((void**)&event->threads);
 }
 
 void destroyModuleDetails(ModuleDetails* moduleDetails) {
   if (!moduleDetails)
     return;
 
-  freeAndInvalidate((void*)moduleDetails->mainModuleId);
+  freeAndInvalidate((void**)&moduleDetails->mainModuleId);
 
   for (int i = 0; i < moduleDetails->moduleCount; i++) {
-    freeAndInvalidate((void*)moduleDetails->moduleIds[i]);
-    freeAndInvalidate((void*)moduleDetails->moduleNames[i]);
+    freeAndInvalidate((void**)&moduleDetails->moduleIds[i]);
+    freeAndInvalidate((void**)&moduleDetails->moduleNames[i]);
   }
-  freeAndInvalidate((void*)moduleDetails->moduleIds);
-  freeAndInvalidate((void*)moduleDetails->moduleNames);
+  freeAndInvalidate((void**)&moduleDetails->moduleIds);
+  freeAndInvalidate((void**)&moduleDetails->moduleNames);
 }
 
 void destroyWrappedEvent(WrappedEvent* wrappedEvent) {
   if (!wrappedEvent)
     return;
 
-  freeAndInvalidate((void*)wrappedEvent->pstrErr);
+  freeAndInvalidate((void**)&wrappedEvent->pstrErr);
   destroyEvent(&wrappedEvent->event);
 }
 
@@ -145,7 +145,7 @@ void destroyWrappedModuleDetails(WrappedModuleDetails* wrappedModuleDetails) {
   if (!wrappedModuleDetails)
     return;
 
-  freeAndInvalidate((void*)wrappedModuleDetails->pstrErr);
+  freeAndInvalidate((void**)&wrappedModuleDetails->pstrErr);
   destroyModuleDetails(&wrappedModuleDetails->moduleDetails);
 }
 
