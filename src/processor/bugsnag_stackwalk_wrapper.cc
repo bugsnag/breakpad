@@ -430,14 +430,14 @@ WrappedEvent GetEventFromMinidump(const char* filename,
 }
 
 // Frees the memory allocated by an Event
-void FreeEvent(WrappedEvent* wrapped_event) {
+void DestroyEvent(WrappedEvent* wrapped_event) {
   if (wrapped_event) {
     destroyWrappedEvent(wrapped_event);
   }
 }
 
 // Frees the memory allocated by the module details
-void FreeModuleDetails(WrappedModuleDetails* wrapped_module_details) {
+void DestroyModuleDetails(WrappedModuleDetails* wrapped_module_details) {
   if (wrapped_module_details) {
     destroyWrappedModuleDetails(wrapped_module_details);
   }
