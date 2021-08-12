@@ -160,6 +160,40 @@ bool ModuleSerializer::SerializeModuleAndLoadIntoFastResolver(
                                                  symbol_data_string);
 }
 
+// Bugsnag function to serialize a single module using the logic from ModuleSerializer::ConvertAllModules and ModuleSerializer::SerializeModuleAndLoadIntoFastResolver
+char* ModuleSerializer::SerializeModule(
+    const BasicSourceLineResolver* basic_resolver,
+    string name,
+    unsigned int* size) {
+  // Check for NULL pointer.
+  if (!basic_resolver) {
+    return NULL;
+  }
+
+  // Traverse module list in basic resolver.
+  BasicSourceLineResolver::ModuleMap::const_iterator iter;
+  iter = basic_resolver->modules_->begin();
+  for (; iter != basic_resolver->modules_->end(); ++iter) {
+    // Find the module matching the input name
+    if (iter->first == name) {
+      BasicSourceLineResolver::Module* basic_module =
+        dynamic_cast<BasicSourceLineResolver::Module*>(iter->second);
+
+      scoped_array<char> symbol_data(Serialize(*basic_module, size));
+      if (!symbol_data.get()) {
+        BPLOG(ERROR) << "Serialization failed for module: " << basic_module->name_;
+
+        return NULL;
+      }
+      BPLOG(INFO) << "Serialized Symbol Size " << *size;
+      
+      return symbol_data.get();
+    }
+  }
+
+  return NULL;
+}
+
 void ModuleSerializer::ConvertAllModules(
     const BasicSourceLineResolver* basic_resolver,
     FastSourceLineResolver* fast_resolver) {

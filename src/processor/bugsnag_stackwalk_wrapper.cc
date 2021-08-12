@@ -12,13 +12,17 @@
 
 #include "google_breakpad/processor/basic_source_line_resolver.h"
 #include "google_breakpad/processor/call_stack.h"
+#include "google_breakpad/processor/fast_source_line_resolver.h"
 #include "google_breakpad/processor/minidump_processor.h"
 #include "google_breakpad/processor/process_state.h"
 #include "google_breakpad/processor/stack_frame_cpu.h"
+#include "processor/basic_code_module.h"
+#include "processor/module_serializer.h"
 #include "processor/pathname_stripper.h"
 
 using google_breakpad::BasicSourceLineResolver;
 using google_breakpad::CallStack;
+using google_breakpad::FastSourceLineResolver;
 using google_breakpad::HexString;
 using google_breakpad::Minidump;
 using google_breakpad::MinidumpMemoryList;
@@ -31,6 +35,7 @@ using google_breakpad::ProcessResult;
 using google_breakpad::ProcessState;
 using google_breakpad::scoped_ptr;
 using google_breakpad::SimpleSymbolSupplier;
+using google_breakpad::SourceLineResolverInterface;
 using google_breakpad::StackFrame;
 
 // Wraps strdup and throws an error if memory allocation fails
@@ -373,27 +378,84 @@ string getFriendlyFailureReason(ProcessResult process_result) {
   }
 }
 
+void loadModulesIntoResolver(FastSourceLineResolver* resolver,
+                             const int stack_module_details_count,
+                             SerializedModuleDetails** stack_module_details) {  
+  for (int i = 0; i < stack_module_details_count; i++) {
+
+    // Load the module based on the logic in ModuleSerializer::SerializeModuleAndLoadIntoFastResolver
+    string symbol_data_string(stack_module_details[i]->serialized_data, stack_module_details[i]->serialized_size);
+
+    scoped_ptr<google_breakpad::CodeModule> code_module(
+        new google_breakpad::BasicCodeModule(0, 0, stack_module_details[i]->module_name, "", "", "", ""));
+
+    resolver->LoadModuleUsingMapBuffer(code_module.get(), symbol_data_string);
+  }
+}
+
+bool SerializeModule(SerializedModuleDetails* stack_module_details) {  
+  try {
+    // Load the module into a basic resolver
+    BasicSourceLineResolver resolver;
+    scoped_ptr<google_breakpad::CodeModule> code_module(
+          new google_breakpad::BasicCodeModule(0, 0, stack_module_details->module_name, "", "", "", ""));
+    bool loaded = resolver.LoadModule(code_module.get(), stack_module_details->module_path);
+    if (!loaded) {
+      BPLOG(ERROR) << "Failed to load Module " << stack_module_details->module_path;
+      return false;
+    }
+
+    // Serialize the module in the resolver
+    google_breakpad::ModuleSerializer serializer;
+    unsigned int serialized_size = 0;
+
+    char* serialized_data = serializer.SerializeModule(&resolver,
+                                                      stack_module_details->module_name,
+                                                      &serialized_size);
+
+    if (serialized_data == NULL) {
+      BPLOG(ERROR) << "failed to serialize " << stack_module_details->module_path;
+      return false;  
+    }
+
+    char* serialized_module = (char*) malloc(serialized_size * sizeof(char*));
+    memcpy(serialized_module, serialized_data, serialized_size);
+    stack_module_details->serialized_size = serialized_size;
+    stack_module_details->serialized_data = serialized_module;
+  } catch (const std::exception& ex) {
+    BPLOG(ERROR) << "encountered exception serializing" << stack_module_details->module_path << ": " << string(ex.what());
+    return false;
+  } catch (...) {
+    BPLOG(ERROR) << "encountered unknown exception serializing " << stack_module_details->module_path;
+    return false;
+  }
+
+  return true;
+}
+
 // Gets an Event payload from the minidump.
 // Note: Logic for parsing the minidump is based on PrintMinidumpProcess in
 // minidump_stackwalk.cc
 WrappedEvent GetEventFromMinidump(const char* filename,
-                                  const int symbol_path_count,
-                                  const char** symbol_paths) {
+                                  const int stack_module_details_count,
+                                  SerializedModuleDetails** stack_module_details) {  
   WrappedEvent result = {{0}};
 
   try {
+    FastSourceLineResolver resolver;
+    loadModulesIntoResolver(&resolver, stack_module_details_count, stack_module_details);
+
     // Apply a symbol supplier if we've been given one or more symbol paths (to
     // allow the stack data to be used when walking the stacktrace)
     std::vector<string> supplied_symbol_paths;
     scoped_ptr<SimpleSymbolSupplier> symbol_supplier;
-    for (int i = 0; i < symbol_path_count; i++) {
-      supplied_symbol_paths.push_back(symbol_paths[i]);
+    for (int i = 0; i < stack_module_details_count; i++) {
+      supplied_symbol_paths.push_back(stack_module_details[i]->module_path);
     }
     if (!supplied_symbol_paths.empty()) {
       symbol_supplier.reset(new SimpleSymbolSupplier(supplied_symbol_paths));
     }
 
-    BasicSourceLineResolver resolver;
     MinidumpProcessor minidump_processor(symbol_supplier.get(), &resolver);
 
     // Increase the maximum number of threads and regions.
@@ -440,5 +502,12 @@ void DestroyEvent(WrappedEvent* wrapped_event) {
 void DestroyModuleDetails(WrappedModuleDetails* wrapped_module_details) {
   if (wrapped_module_details) {
     destroyWrappedModuleDetails(wrapped_module_details);
+  }
+}
+
+// Frees the memory allocated by the serialized module details
+void DestroySerializedModuleDetails(SerializedModuleDetails* serialized_module_details) {
+  if (serialized_module_details) {
+    freeAndInvalidate((void**)&serialized_module_details->serialized_data);
   }
 }
