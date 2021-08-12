@@ -163,7 +163,7 @@ bool ModuleSerializer::SerializeModuleAndLoadIntoFastResolver(
 // Bugsnag function to serialize a single module using the logic from ModuleSerializer::ConvertAllModules and ModuleSerializer::SerializeModuleAndLoadIntoFastResolver
 char* ModuleSerializer::SerializeModule(
     const BasicSourceLineResolver* basic_resolver,
-    string name,
+    string code_file,
     unsigned int* size) {
   // Check for NULL pointer.
   if (!basic_resolver) {
@@ -175,7 +175,7 @@ char* ModuleSerializer::SerializeModule(
   iter = basic_resolver->modules_->begin();
   for (; iter != basic_resolver->modules_->end(); ++iter) {
     // Find the module matching the input name
-    if (iter->first == name) {
+    if (iter->first == code_file) {
       BasicSourceLineResolver::Module* basic_module =
         dynamic_cast<BasicSourceLineResolver::Module*>(iter->second);
 

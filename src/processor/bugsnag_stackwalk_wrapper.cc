@@ -331,6 +331,11 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
     if (!module_names) {
       throw std::bad_alloc();
     }
+    char** module_code_files =
+        (char**)malloc(sizeof(char*) * module_list->module_count());
+    if (!module_code_files) {
+      throw std::bad_alloc();
+    }
 
     for (unsigned int i = 0; i < module_list->module_count(); i++) {
       const MinidumpModule* module = module_list->GetModuleAtIndex(i);
@@ -343,9 +348,13 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
 
       string debug_file = PathnameStripper::File(module->debug_file());
       module_names[i] = duplicate(debug_file);
+
+      string code_file = module->code_file();
+      module_code_files[i] = duplicate(code_file);
     };
     result.moduleDetails.moduleIds = module_ids;
     result.moduleDetails.moduleNames = module_names;
+    result.moduleDetails.moduleCodeFiles = module_code_files;
   } catch (const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
     result.pstrErr = duplicate(errMsg);
@@ -387,7 +396,7 @@ void loadModulesIntoResolver(FastSourceLineResolver* resolver,
     string symbol_data_string(stack_module_details[i]->serialized_data, stack_module_details[i]->serialized_size);
 
     scoped_ptr<google_breakpad::CodeModule> code_module(
-        new google_breakpad::BasicCodeModule(0, 0, stack_module_details[i]->module_name, "", "", "", ""));
+        new google_breakpad::BasicCodeModule(0, 0, stack_module_details[i]->code_file, "", "", "", ""));
 
     resolver->LoadModuleUsingMapBuffer(code_module.get(), symbol_data_string);
   }
@@ -398,7 +407,7 @@ bool SerializeModule(SerializedModuleDetails* stack_module_details) {
     // Load the module into a basic resolver
     BasicSourceLineResolver resolver;
     scoped_ptr<google_breakpad::CodeModule> code_module(
-          new google_breakpad::BasicCodeModule(0, 0, stack_module_details->module_name, "", "", "", ""));
+          new google_breakpad::BasicCodeModule(0, 0, stack_module_details->code_file, "", "", "", ""));
     bool loaded = resolver.LoadModule(code_module.get(), stack_module_details->module_path);
     if (!loaded) {
       BPLOG(ERROR) << "Failed to load Module " << stack_module_details->module_path;
@@ -410,7 +419,7 @@ bool SerializeModule(SerializedModuleDetails* stack_module_details) {
     unsigned int serialized_size = 0;
 
     char* serialized_data = serializer.SerializeModule(&resolver,
-                                                      stack_module_details->module_name,
+                                                      stack_module_details->code_file,
                                                       &serialized_size);
 
     if (serialized_data == NULL) {
@@ -445,18 +454,7 @@ WrappedEvent GetEventFromMinidump(const char* filename,
     FastSourceLineResolver resolver;
     loadModulesIntoResolver(&resolver, stack_module_details_count, stack_module_details);
 
-    // Apply a symbol supplier if we've been given one or more symbol paths (to
-    // allow the stack data to be used when walking the stacktrace)
-    std::vector<string> supplied_symbol_paths;
-    scoped_ptr<SimpleSymbolSupplier> symbol_supplier;
-    for (int i = 0; i < stack_module_details_count; i++) {
-      supplied_symbol_paths.push_back(stack_module_details[i]->module_path);
-    }
-    if (!supplied_symbol_paths.empty()) {
-      symbol_supplier.reset(new SimpleSymbolSupplier(supplied_symbol_paths));
-    }
-
-    MinidumpProcessor minidump_processor(symbol_supplier.get(), &resolver);
+    MinidumpProcessor minidump_processor(new SimpleSymbolSupplier(""), &resolver);
 
     // Increase the maximum number of threads and regions.
     MinidumpThreadList::set_max_threads(std::numeric_limits<uint32_t>::max());

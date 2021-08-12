@@ -78,7 +78,7 @@ class ModuleSerializer {
   // Bugsnag function to serialize a single module
   char* SerializeModule(
     const BasicSourceLineResolver* basic_resolver,
-    string name,
+    string code_file,
     unsigned int* size);
 
   // Given the string format symbol_data, produces a chunk of serialized data.

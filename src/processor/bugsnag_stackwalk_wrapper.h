@@ -61,6 +61,7 @@ typedef struct ModuleDetails {
   char* mainModuleId;
   char** moduleIds;
   char** moduleNames;
+  char** moduleCodeFiles;
 } ModuleDetails;
 
 typedef struct WrappedEvent {
@@ -74,7 +75,7 @@ typedef struct WrappedModuleDetails {
 } WrappedModuleDetails;
 
 typedef struct SerializedModuleDetails {
-  const char* module_name;
+  const char* code_file;
   const char* module_path;
   unsigned int serialized_size;
   char* serialized_data;
