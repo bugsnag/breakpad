@@ -1,11 +1,14 @@
 #include "bugsnag_stackwalk_wrapper.h"
+#include "bugsnag_register_reader.h"
 
 #include "common/scoped_ptr.h"
 #include "logging.h"
 #include "simple_symbol_supplier.h"
 
 #include <string.h>
+#include <iomanip>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -20,11 +23,14 @@
 #include "processor/module_serializer.h"
 #include "processor/pathname_stripper.h"
 
+#include "google_breakpad/common/minidump_format.h"
+
 using google_breakpad::BasicSourceLineResolver;
 using google_breakpad::CallStack;
 using google_breakpad::FastSourceLineResolver;
 using google_breakpad::HexString;
 using google_breakpad::Minidump;
+using google_breakpad::MinidumpCrashpadInfo;
 using google_breakpad::MinidumpMemoryList;
 using google_breakpad::MinidumpModule;
 using google_breakpad::MinidumpModuleList;
@@ -39,7 +45,7 @@ using google_breakpad::SourceLineResolverInterface;
 using google_breakpad::StackFrame;
 
 // Wraps strdup and throws an error if memory allocation fails
-char* duplicate(const std::string& s) {
+static char* duplicate(const std::string& s) {
   char* str = strdup(s.c_str());
   if (!str) {
     throw std::bad_alloc();
@@ -48,12 +54,12 @@ char* duplicate(const std::string& s) {
 }
 
 // Calls free on passed pointer and sets it to nullptr
-void freeAndInvalidate(void** p) {
+static void freeAndInvalidate(void** p) {
   free((void*)*p);
   *p = nullptr;
 }
 
-void destroyStackframe(void* self) {
+static void destroyStackframe(void* self) {
   Stackframe* stackframe = (Stackframe*)self;
   if (!stackframe)
     return;
@@ -70,7 +76,7 @@ void destroyStackframe(void* self) {
   freeAndInvalidate((void**)&stackframe->trust);
 }
 
-void destroyStacktrace(Stacktrace* stacktrace) {
+static void destroyStacktrace(Stacktrace* stacktrace) {
   if (!stacktrace)
     return;
 
@@ -80,23 +86,42 @@ void destroyStacktrace(Stacktrace* stacktrace) {
   freeAndInvalidate((void**)&stacktrace->frames);
 }
 
-void destroyException(Exception* exception) {
+static void destroyRegisterValue(RegisterValue* reg) {
+  if (!reg)
+    return;
+
+  freeAndInvalidate((void**)&reg->name);
+  freeAndInvalidate((void**)&reg->value);
+}
+
+static void destroyRegisters(Register* registers) {
+  if (!registers)
+    return;
+
+  for (int i = 0; i < registers->registerValueCount; ++i) {
+    destroyRegisterValue(&registers->registerValues[i]);
+  }
+  freeAndInvalidate((void**)&registers->registerValues);
+}
+
+static void destroyException(Exception* exception) {
   if (!exception)
     return;
 
   freeAndInvalidate((void**)&exception->errorClass);
   freeAndInvalidate((void**)&exception->crashAddress);
   destroyStacktrace(&exception->stacktrace);
+  destroyRegisters(exception->registers);
 }
 
-void destroyApp(App* app) {
+static void destroyApp(App* app) {
   if (!app)
     return;
 
   freeAndInvalidate((void**)&app->binaryArch);
 }
 
-void destroyDevice(Device* device) {
+static void destroyDevice(Device* device) {
   if (!device)
     return;
 
@@ -104,14 +129,71 @@ void destroyDevice(Device* device) {
   freeAndInvalidate((void**)&device->osVersion);
 }
 
-void destroyThread(Thread* thread) {
+static void destroyThread(Thread* thread) {
   if (!thread)
     return;
 
   destroyStacktrace(&thread->stacktrace);
 }
 
-void destroyEvent(Event* event) {
+static void destroySimpleAnnotation(SimpleAnnotation* simpleAnnotation) {
+  if (!simpleAnnotation)
+    return;
+
+  freeAndInvalidate((void**)&simpleAnnotation->key);
+  freeAndInvalidate((void**)&simpleAnnotation->value);
+}
+
+static void destroyListAnnotation(ListAnnotation* listAnnotation) {
+  if (!listAnnotation)
+    return;
+
+  freeAndInvalidate((void**)&listAnnotation->value);
+}
+
+static void destroyModuleInfo(ModuleInfo* moduleInfo) {
+  if (!moduleInfo)
+    return;
+
+  freeAndInvalidate((void**)&moduleInfo->moduleName);
+
+  for (int i = 0; i < moduleInfo->simpleAnnotationCount; ++i) {
+    destroySimpleAnnotation(&moduleInfo->simpleAnnotations[i]);
+  }
+  freeAndInvalidate((void**)&moduleInfo->simpleAnnotations);
+
+  for (int i = 0; i < moduleInfo->listAnnotationCount; ++i) {
+    destroyListAnnotation(&moduleInfo->listAnnotations[i]);
+  }
+  freeAndInvalidate((void**)&moduleInfo->listAnnotations);
+}
+
+static void destroyCrashpadInfo(CrashpadInfo* crashpadInfo) {
+  if (!crashpadInfo)
+    return;
+
+  freeAndInvalidate((void**)&crashpadInfo->clientId);
+  freeAndInvalidate((void**)&crashpadInfo->reportId);
+  for (int i = 0; i < crashpadInfo->simpleAnnotationCount; ++i) {
+    destroySimpleAnnotation(&crashpadInfo->simpleAnnotations[i]);
+  }
+  freeAndInvalidate((void**)&crashpadInfo->simpleAnnotations);
+
+  for (int i = 0; i < crashpadInfo->moduleCount; ++i) {
+    destroyModuleInfo(&crashpadInfo->moduleInfo[i]);
+  }
+  freeAndInvalidate((void**)&crashpadInfo->moduleInfo);
+}
+
+static void destroyMinidumpMetadata(MinidumpMetadata* minidumpMetadata) {
+  if (!minidumpMetadata)
+    return;
+
+  destroyCrashpadInfo(&minidumpMetadata->crashpadInfo);
+  freeAndInvalidate((void**)&minidumpMetadata->assertion);
+}
+
+static void destroyEvent(Event* event) {
   if (!event)
     return;
 
@@ -122,9 +204,10 @@ void destroyEvent(Event* event) {
     destroyThread(&event->threads[i]);
   }
   freeAndInvalidate((void**)&event->threads);
+  destroyMinidumpMetadata(&event->metaData);
 }
 
-void destroyModuleDetails(ModuleDetails* moduleDetails) {
+static void destroyModuleDetails(ModuleDetails* moduleDetails) {
   if (!moduleDetails)
     return;
 
@@ -138,7 +221,7 @@ void destroyModuleDetails(ModuleDetails* moduleDetails) {
   freeAndInvalidate((void**)&moduleDetails->moduleNames);
 }
 
-void destroyWrappedEvent(WrappedEvent* wrappedEvent) {
+static void destroyWrappedEvent(WrappedEvent* wrappedEvent) {
   if (!wrappedEvent)
     return;
 
@@ -146,7 +229,8 @@ void destroyWrappedEvent(WrappedEvent* wrappedEvent) {
   destroyEvent(&wrappedEvent->event);
 }
 
-void destroyWrappedModuleDetails(WrappedModuleDetails* wrappedModuleDetails) {
+static void destroyWrappedModuleDetails(
+    WrappedModuleDetails* wrappedModuleDetails) {
   if (!wrappedModuleDetails)
     return;
 
@@ -155,7 +239,7 @@ void destroyWrappedModuleDetails(WrappedModuleDetails* wrappedModuleDetails) {
 }
 
 // Gets the index of the thread that requested a dump be written
-int getErrorReportingThreadIndex(const ProcessState& process_state) {
+static int getErrorReportingThreadIndex(const ProcessState& process_state) {
   int index = process_state.requesting_thread();
   // If the dump thread was not available then default to the first available
   // thread
@@ -166,7 +250,7 @@ int getErrorReportingThreadIndex(const ProcessState& process_state) {
 }
 
 // Gets a friendly version of the stack frame trust value
-string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust) {
+static string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust) {
   switch (stackFrameTrust) {
     case StackFrame::FRAME_TRUST_NONE:
       return "NONE";
@@ -258,10 +342,66 @@ Thread* getThreads(const ProcessState& process_state) {
   return threads;
 }
 
+static Register getRegistersForStackFrame(const StackFrame* frame,
+                                         const string& cpu) {
+  RegisterValue* registerArray = nullptr;
+  // frameIndex of -1 indicates it has not been set - caller must set this field
+  Register reg = {.frameIndex = -1};
+
+  std::map<std::string, std::string> registerMap =
+      bugsnag_breakpad::getRegisterValues(frame, cpu);
+
+  if (registerMap.size() > 0) {
+    registerArray =
+        (RegisterValue*)malloc(sizeof(RegisterValue) * registerMap.size());
+    if (!registerArray) {
+      throw std::bad_alloc();
+    }
+
+    uint32_t registerIndex = 0;
+    for (std::map<std::string, std::string>::const_iterator iterator =
+             registerMap.begin();
+         iterator != registerMap.end(); ++iterator) {
+      RegisterValue regValue = {.name = duplicate(iterator->first.c_str()),
+                                .value = duplicate(iterator->second.c_str())};
+      registerArray[registerIndex++] = regValue;
+    }
+
+    reg.registerValueCount = static_cast<int>(registerIndex);
+    reg.registerValues = registerArray;
+  }
+
+  return reg;
+}
+
 // Maps the information from a minidump into our Event struct
-Event getEvent(const ProcessState& process_state) {
+static Event getEvent(const ProcessState& process_state) {
   Stacktrace s = getStack(
       process_state.threads()->at(getErrorReportingThreadIndex(process_state)));
+
+  string cpu = process_state.system_info()->cpu;
+  const CallStack* stack =
+      process_state.threads()->at(getErrorReportingThreadIndex(process_state));
+
+  // currently retrieve the registers for only the top stack frame
+  const uint32_t NUMBER_OF_STACK_FRAMES = 1;
+  Register* registers =
+      (Register*)malloc(sizeof(Register) * NUMBER_OF_STACK_FRAMES);
+  if (!registers) {
+    throw std::bad_alloc();
+  }
+
+  // get the exception register info
+  uint32_t framesAdded = 0;
+  for (uint32_t frameIndex = 0; frameIndex < NUMBER_OF_STACK_FRAMES &&
+                                frameIndex < stack->frames()->size();
+       ++frameIndex) {
+    const StackFrame* frame = stack->frames()->at(frameIndex);
+    Register r = getRegistersForStackFrame(frame, cpu);
+    r.frameIndex = frameIndex;
+    registers[frameIndex] = r;
+    ++framesAdded;
+  }
 
   Exception e = {.stacktrace = s,
                  .errorClass = duplicate(process_state.crash_reason())};
@@ -269,6 +409,8 @@ Event getEvent(const ProcessState& process_state) {
   if (crashAddress != "") {
     e.crashAddress = duplicate(crashAddress);
   }
+  e.registerCount = framesAdded;
+  e.registers = registers;
 
   int uptime = 0;
   if (process_state.time_date_stamp() != 0 &&
@@ -290,7 +432,8 @@ Event getEvent(const ProcessState& process_state) {
                        .exception = e,
                        .app = app,
                        .device = device,
-                       .threads = getThreads(process_state)};
+                       .threads = getThreads(process_state),
+                       .unhandled = process_state.crashed()};
 
   return returnEvent;
 }
@@ -366,7 +509,7 @@ WrappedModuleDetails GetModuleDetails(const char* minidump_filename) {
 }
 
 // Gets a friendly version of a minidump processing failure reason
-string getFriendlyFailureReason(ProcessResult process_result) {
+static string getFriendlyFailureReason(ProcessResult process_result) {
   switch (process_result) {
     case google_breakpad::PROCESS_ERROR_MINIDUMP_NOT_FOUND:
       return "minidump not found";
@@ -442,6 +585,230 @@ bool SerializeModule(SerializedModuleDetails* stack_module_details) {
   return true;
 }
 
+static string MDGUIDToString(const MDGUID& uuid) {
+  char buf[37];
+  snprintf(buf, sizeof(buf), "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+           uuid.data1, uuid.data2, uuid.data3, uuid.data4[0], uuid.data4[1],
+           uuid.data4[2], uuid.data4[3], uuid.data4[4], uuid.data4[5],
+           uuid.data4[6], uuid.data4[7]);
+  return std::string(buf);
+}
+
+static uint32_t getSimpleAnnotations(MinidumpCrashpadInfo& mci,
+                                     SimpleAnnotation** simpleAnnotationArray) {
+  const std::map<std::string, std::string>* simpleAnnotations =
+      mci.GetSimpleAnnotations();
+  if (!simpleAnnotations) {
+    return 0;
+  }
+
+  const uint32_t simpleAnnotationCount =
+      (simpleAnnotations ? simpleAnnotations->size() : 0);
+  if (simpleAnnotationCount > 0) {
+    *simpleAnnotationArray = (SimpleAnnotation*)malloc(
+        sizeof(SimpleAnnotation) * simpleAnnotationCount);
+    if (!*simpleAnnotationArray) {
+      throw std::bad_alloc();
+    }
+
+    uint32_t simpleAnnotationIndex = 0;
+    for (std::map<std::string, std::string>::const_iterator iterator =
+             simpleAnnotations->begin();
+         iterator != simpleAnnotations->end(); ++iterator) {
+      SimpleAnnotation simpleAnnotation = {
+          .key = duplicate(iterator->first.c_str()),
+          .value = duplicate(iterator->second.c_str())};
+      (*simpleAnnotationArray)[simpleAnnotationIndex++] = simpleAnnotation;
+    }
+  }
+  return simpleAnnotationCount;
+}
+
+static uint32_t getListAnnotationsForModule(
+    const uint32_t module_index,
+    const std::vector<std::vector<std::string>>* infoListAnnotations,
+    ListAnnotation** modulesListAnnotationArray) {
+  if (!infoListAnnotations) {
+    return 0;
+  }
+
+  const uint32_t modulesListAnnotationCount =
+      (*infoListAnnotations)[module_index].size();
+  if (modulesListAnnotationCount > 0) {
+    *modulesListAnnotationArray = (ListAnnotation*)malloc(
+        sizeof(ListAnnotation) * modulesListAnnotationCount);
+    if (!*modulesListAnnotationArray) {
+      throw std::bad_alloc();
+    }
+  }
+
+  for (uint32_t annotation_index = 0;
+       annotation_index < modulesListAnnotationCount; ++annotation_index) {
+    ListAnnotation listAnnotation = {
+        .value = duplicate(
+            (*infoListAnnotations)[module_index][annotation_index].c_str())};
+    (*modulesListAnnotationArray)[annotation_index] = listAnnotation;
+  }
+
+  return modulesListAnnotationCount;
+}
+
+static uint32_t getSimpleAnnotationsForModule(
+    const uint32_t module_index,
+    const std::vector<std::map<std::string, std::string>>*
+        infoSimpleAnnotations,
+    SimpleAnnotation** modulesSimpleAnnotationArray) {
+  if (!infoSimpleAnnotations) {
+    return 0;
+  }
+
+  const uint32_t modulesSimpleAnnotationCount =
+      (*infoSimpleAnnotations)[module_index].size();
+  if (modulesSimpleAnnotationCount > 0) {
+    *modulesSimpleAnnotationArray = (SimpleAnnotation*)malloc(
+        sizeof(SimpleAnnotation) * modulesSimpleAnnotationCount);
+    if (!*modulesSimpleAnnotationArray) {
+      throw std::bad_alloc();
+    }
+  }
+
+  uint32_t simpleAnnotationIndex = 0;
+  for (std::map<std::string, std::string>::const_iterator iterator =
+           (*infoSimpleAnnotations)[module_index].begin();
+       iterator != (*infoSimpleAnnotations)[module_index].end(); ++iterator) {
+    if (simpleAnnotationIndex >= modulesSimpleAnnotationCount) {
+      BPLOG(ERROR) << "Array out of bounds";
+      break;
+    }
+    SimpleAnnotation simpleAnnotation = {
+        .key = duplicate(iterator->first.c_str()),
+        .value = duplicate(iterator->second.c_str())};
+    (*modulesSimpleAnnotationArray)[simpleAnnotationIndex++] = simpleAnnotation;
+  }
+  return modulesSimpleAnnotationCount;
+}
+
+static uint32_t getModuleAnnotations(Minidump& dump,
+                                     MinidumpCrashpadInfo& mci,
+                                     ModuleInfo** moduleInfoArray) {
+  const uint32_t moduleInfoCount =
+      ((mci.GetModuleCrashpadInfoLinks())
+           ? mci.GetModuleCrashpadInfoLinks()->size()
+           : 0);
+  if (moduleInfoCount == 0) {
+    return 0;
+  }
+
+  const std::vector<std::vector<std::string>>* infoListAnnotations =
+      mci.GetInfoListAnnotations();
+
+  const std::vector<std::map<std::string, std::string>>* infoSimpleAnnotations =
+      mci.GetInfoSimpleAnnotations();
+
+  if (!infoListAnnotations && !infoSimpleAnnotations) {
+    return 0;
+  }
+
+  std::vector<ModuleInfo> moduleInfoVector;
+  MinidumpModuleList* module_list = dump.GetModuleList();
+  if (!module_list) {
+    BPLOG(ERROR) << "Cannot get module list for minidump";
+    return 0;
+  }
+
+  for (uint32_t module_index = 0; module_index < moduleInfoCount;
+       ++module_index) {
+    ListAnnotation* modulesListAnnotationArray = nullptr;
+    SimpleAnnotation* modulesSimpleAnnotationArray = nullptr;
+
+    string code_file = "";
+    const MinidumpModule* module = module_list->GetModuleAtIndex(module_index);
+    if (module) {
+      code_file = PathnameStripper::File(module->code_file());
+    }
+    if (code_file == "") {
+      BPLOG(ERROR) << "Cannot get module name for minidump";
+      continue;
+    }
+
+    const uint32_t modulesListAnnotationCount = getListAnnotationsForModule(
+        module_index, infoListAnnotations, &modulesListAnnotationArray);
+
+    const uint32_t modulesSimpleAnnotationCount = getSimpleAnnotationsForModule(
+        module_index, infoSimpleAnnotations, &modulesSimpleAnnotationArray);
+
+    if ((modulesListAnnotationCount == 0) &&
+        (modulesSimpleAnnotationCount == 0)) {
+      // only add modules that have some list annotations or simple annotations
+      continue;
+    }
+
+    ModuleInfo moduleInfo = {
+        .moduleName = duplicate(code_file),
+        .listAnnotationCount = static_cast<int>(modulesListAnnotationCount),
+        .listAnnotations = modulesListAnnotationArray,
+        .simpleAnnotationCount = static_cast<int>(modulesSimpleAnnotationCount),
+        .simpleAnnotations = modulesSimpleAnnotationArray,
+    };
+    moduleInfoVector.push_back(moduleInfo);
+  }
+
+  const uint32_t moduleInfoItemCount = moduleInfoVector.size();
+  if (moduleInfoItemCount > 0) {
+    *moduleInfoArray =
+        (ModuleInfo*)malloc(sizeof(ModuleInfo) * moduleInfoItemCount);
+    if (!*moduleInfoArray) {
+      throw std::bad_alloc();
+    }
+
+    uint32_t moduleIndex = 0;
+    for (std::vector<ModuleInfo>::const_iterator iterator =
+             moduleInfoVector.begin();
+         iterator != moduleInfoVector.end(); ++iterator) {
+      (*moduleInfoArray)[moduleIndex++] = std::move(*iterator);
+    }
+  }
+  return moduleInfoItemCount;
+}
+
+MinidumpMetadata getMinidumpMetadata(Minidump& dump,
+                                     const ProcessState& process_state) {
+  SimpleAnnotation* simpleAnnotationArray = nullptr;
+  ModuleInfo* moduleInfoArray = nullptr;
+
+  MinidumpCrashpadInfo* mci = dump.GetCrashpadInfo();
+  if (!mci) {
+    return MinidumpMetadata{};
+  }
+
+  const uint32_t simpleAnnotationCount =
+      getSimpleAnnotations(*mci, &simpleAnnotationArray);
+
+  const uint32_t moduleInfoCount =
+      getModuleAnnotations(dump, *mci, &moduleInfoArray);
+
+  string report_id = "";
+  string client_id = "";
+  if (mci->crashpad_info()) {
+    report_id = MDGUIDToString(mci->crashpad_info()->report_id);
+    client_id = MDGUIDToString(mci->crashpad_info()->client_id);
+  }
+
+  CrashpadInfo crashpadInfo = {
+      .reportId = duplicate(report_id),
+      .clientId = duplicate(client_id),
+      .simpleAnnotationCount = static_cast<int>(simpleAnnotationCount),
+      .simpleAnnotations = simpleAnnotationArray,
+      .moduleCount = static_cast<int>(moduleInfoCount),
+      .moduleInfo = moduleInfoArray};
+
+  MinidumpMetadata minidumpMetadata = {
+      .crashpadInfo = crashpadInfo,
+      .assertion = duplicate(process_state.assertion().c_str())};
+
+  return minidumpMetadata;
+}
+
 // Gets an Event payload from the minidump.
 // Note: Logic for parsing the minidump is based on PrintMinidumpProcess in
 // minidump_stackwalk.cc
@@ -479,6 +846,10 @@ WrappedEvent GetEventFromMinidump(const char* filename,
 
     // Map the process state to an Event struct
     result.event = getEvent(process_state);
+
+    // Populate metadata
+    result.event.metaData = getMinidumpMetadata(dump, process_state);
+
   } catch (const std::exception& ex) {
     string errMsg = "encountered exception: " + string(ex.what());
     result.pstrErr = duplicate(errMsg);

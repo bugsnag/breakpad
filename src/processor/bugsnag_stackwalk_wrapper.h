@@ -25,10 +25,23 @@ typedef struct Stacktrace {
   Stackframe* frames;
 } Stacktrace;
 
+typedef struct RegisterValue {
+  const char* name;
+  const char* value;
+} RegisterValue;
+
+typedef struct Register {
+  int frameIndex;
+  int registerValueCount;
+  RegisterValue* registerValues;
+} Register;
+
 typedef struct Exception {
   Stacktrace stacktrace;
   const char* errorClass;
   const char* crashAddress;
+  int registerCount;
+  Register* registers;
 } Exception;
 
 typedef struct App {
@@ -47,6 +60,37 @@ typedef struct Thread {
   Stacktrace stacktrace;
 } Thread;
 
+typedef struct SimpleAnnotation {
+  const char* key;
+  const char* value;
+} SimpleAnnotation;
+
+typedef struct ListAnnotation {
+  const char* value;
+} ListAnnotation;
+
+typedef struct ModuleInfo {
+  const char* moduleName;
+  int listAnnotationCount;
+  ListAnnotation* listAnnotations;
+  int simpleAnnotationCount;
+  SimpleAnnotation* simpleAnnotations;
+} ModuleInfo;
+
+typedef struct CrashpadInfo {
+  const char* reportId;
+  const char* clientId;
+  int simpleAnnotationCount;
+  SimpleAnnotation* simpleAnnotations;
+  int moduleCount;
+  ModuleInfo* moduleInfo;
+} CrashpadInfo;
+
+typedef struct MinidumpMetadata {
+  CrashpadInfo crashpadInfo;
+  const char* assertion;
+} MinidumpMetadata;
+
 typedef struct Event {
   int threadCount;
   const char* temp;
@@ -54,6 +98,8 @@ typedef struct Event {
   App app;
   Device device;
   Thread* threads;
+  MinidumpMetadata metaData;
+  bool unhandled;
 } Event;
 
 typedef struct ModuleDetails {
