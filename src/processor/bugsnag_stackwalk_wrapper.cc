@@ -216,9 +216,11 @@ static void destroyModuleDetails(ModuleDetails* moduleDetails) {
   for (int i = 0; i < moduleDetails->moduleCount; i++) {
     freeAndInvalidate((void**)&moduleDetails->moduleIds[i]);
     freeAndInvalidate((void**)&moduleDetails->moduleNames[i]);
+    freeAndInvalidate((void**)&moduleDetails->moduleCodeFiles[i]);
   }
   freeAndInvalidate((void**)&moduleDetails->moduleIds);
   freeAndInvalidate((void**)&moduleDetails->moduleNames);
+  freeAndInvalidate((void**)&moduleDetails->moduleCodeFiles);
 }
 
 static void destroyWrappedEvent(WrappedEvent* wrappedEvent) {
