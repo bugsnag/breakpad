@@ -572,8 +572,9 @@ bool SerializeModule(SerializedModuleDetails* stack_module_details) {
       return false;  
     }
 
-    char* serialized_module = (char*) malloc(serialized_size * sizeof(char*));
+    char* serialized_module = (char*) malloc(serialized_size * sizeof(char));
     memcpy(serialized_module, serialized_data, serialized_size);
+    delete[] serialized_data;
     stack_module_details->serialized_size = serialized_size;
     stack_module_details->serialized_data = serialized_module;
   } catch (const std::exception& ex) {

@@ -179,15 +179,7 @@ char* ModuleSerializer::SerializeModule(
       BasicSourceLineResolver::Module* basic_module =
         dynamic_cast<BasicSourceLineResolver::Module*>(iter->second);
 
-      scoped_array<char> symbol_data(Serialize(*basic_module, size));
-      if (!symbol_data.get()) {
-        BPLOG(ERROR) << "Serialization failed for module: " << basic_module->name_;
-
-        return NULL;
-      }
-      BPLOG(INFO) << "Serialized Symbol Size " << *size;
-      
-      return symbol_data.get();
+      return Serialize(*basic_module, size);
     }
   }
 
