@@ -573,7 +573,7 @@ bool SerializeModule(SerializedModuleDetails* stack_module_details) {
     }
 
     char* serialized_module = (char*) malloc(serialized_size * sizeof(char));
-    memcpy(serialized_module, serialized_data, serialized_size);
+    memcpy(serialized_module, serialized_data, serialized_size * sizeof(char));
     delete[] serialized_data;
     stack_module_details->serialized_size = serialized_size;
     stack_module_details->serialized_data = serialized_module;
