@@ -378,12 +378,15 @@ static Register getRegistersForStackFrame(const StackFrame* frame,
 
 // Maps the information from a minidump into our Event struct
 static Event getEvent(const ProcessState& process_state) {
-  Stacktrace s = getStack(
-      process_state.threads()->at(getErrorReportingThreadIndex(process_state)));
+  CallStack* stack = new CallStack;
+  Stacktrace s = {.frameCount = 0, .frames = new Stackframe[0]};
+  
+  if (process_state.threads()->size() > 0) {
+    stack = process_state.threads()->at(getErrorReportingThreadIndex(process_state));
+    s = getStack(stack);
+  }
 
   string cpu = process_state.system_info()->cpu;
-  const CallStack* stack =
-      process_state.threads()->at(getErrorReportingThreadIndex(process_state));
 
   // currently retrieve the registers for only the top stack frame
   const uint32_t NUMBER_OF_STACK_FRAMES = 1;
