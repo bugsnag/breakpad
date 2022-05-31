@@ -274,7 +274,7 @@ static string getFriendlyTrustValue(StackFrame::FrameTrust stackFrameTrust) {
 }
 
 // Maps the stacktrace information from a minidump into our Stacktrace struct
-static Stacktrace getStack(const CallStack* stack) {
+static Stacktrace getStacktrace(const CallStack* stack) {
   int frame_count = stack->frames()->size();
   Stackframe* stackframes = new Stackframe[frame_count];
   for (int frame_index = 0; frame_index < frame_count; ++frame_index) {
@@ -337,7 +337,7 @@ Thread* getThreads(const ProcessState& process_state) {
     int thread_id = thread->tid();
     Thread t = {.id = thread_id,
                 .errorReportingThread = (i == error_reporting_thread_index),
-                .stacktrace = getStack(thread)};
+                .stacktrace = getStacktrace(thread)};
     threads[i] = t;
   }
 
@@ -378,12 +378,18 @@ static Register getRegistersForStackFrame(const StackFrame* frame,
 
 // Maps the information from a minidump into our Event struct
 static Event getEvent(const ProcessState& process_state) {
-  Stacktrace s = getStack(
-      process_state.threads()->at(getErrorReportingThreadIndex(process_state)));
+  CallStack* stack = nullptr;
+  Stacktrace stacktrace = {};
 
+  if (process_state.threads()->size() > 0) {
+    stack = process_state.threads()->at(getErrorReportingThreadIndex(process_state));
+    stacktrace = getStacktrace(stack);
+  } else {
+    stack = new CallStack;
+    stacktrace = (struct Stacktrace){.frameCount = 0, .frames = new Stackframe[0]};
+  }
+ 
   string cpu = process_state.system_info()->cpu;
-  const CallStack* stack =
-      process_state.threads()->at(getErrorReportingThreadIndex(process_state));
 
   // currently retrieve the registers for only the top stack frame
   const uint32_t NUMBER_OF_STACK_FRAMES = 1;
@@ -405,7 +411,7 @@ static Event getEvent(const ProcessState& process_state) {
     ++framesAdded;
   }
 
-  Exception e = {.stacktrace = s,
+  Exception e = {.stacktrace = stacktrace,
                  .errorClass = duplicate(process_state.crash_reason())};
   string crashAddress = HexString(process_state.crash_address());
   if (crashAddress != "") {
