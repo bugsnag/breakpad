@@ -891,7 +891,7 @@ void DestroyModuleDetails(WrappedModuleDetails* wrapped_module_details) {
 
 // Frees the memory allocated by the serialized module details
 void DestroySerializedModuleDetails(SerializedModuleDetails* serialized_module_details) {
-  if (serialized_module_details) {
+  if (serialized_module_details && serialized_module_details->serialized_data) {
     freeAndInvalidate((void**)&serialized_module_details->serialized_data);
   }
 }
