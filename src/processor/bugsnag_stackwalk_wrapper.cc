@@ -565,6 +565,7 @@ bool SerializeModule(SerializedModuleDetails* stack_module_details) {
     BasicSourceLineResolver resolver;
     scoped_ptr<google_breakpad::CodeModule> code_module(
           new google_breakpad::BasicCodeModule(0, 0, stack_module_details->code_file, "", "", "", ""));
+    
     bool loaded = resolver.LoadModule(code_module.get(), stack_module_details->module_path);
     if (!loaded) {
       BPLOG(ERROR) << "Failed to load Module " << stack_module_details->module_path;
@@ -891,7 +892,7 @@ void DestroyModuleDetails(WrappedModuleDetails* wrapped_module_details) {
 
 // Frees the memory allocated by the serialized module details
 void DestroySerializedModuleDetails(SerializedModuleDetails* serialized_module_details) {
-  if (serialized_module_details) {
+  if (serialized_module_details && serialized_module_details->serialized_data) {
     freeAndInvalidate((void**)&serialized_module_details->serialized_data);
   }
 }
