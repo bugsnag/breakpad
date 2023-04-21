@@ -1,5 +1,4 @@
-// Copyright (c) 2014 Google Inc.
-// All rights reserved.
+// Copyright 2014 Google LLC
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -11,7 +10,7 @@
 // copyright notice, this list of conditions and the following disclaimer
 // in the documentation and/or other materials provided with the
 // distribution.
-//     * Neither the name of Google Inc. nor the names of its
+//     * Neither the name of Google LLC nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
 //
@@ -29,6 +28,10 @@
 
 // microdump_stackwalk.cc: Process a microdump with MicrodumpProcessor, printing
 // the results, including stack traces.
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>  // Must come first
+#endif
 
 #include <stdio.h>
 #include <string.h>
@@ -110,7 +113,10 @@ int PrintMicrodumpProcess(const Options& options) {
     if (options.machine_readable) {
       PrintProcessStateMachineReadable(process_state);
     } else {
-      PrintProcessState(process_state, options.output_stack_contents, &resolver);
+      // Microdump has only one thread, |output_requesting_thread_only|'s value
+      // has no effect.
+      PrintProcessState(process_state, options.output_stack_contents,
+                        /*output_requesting_thread_only=*/false, &resolver);
     }
     return 0;
   }

@@ -1,5 +1,4 @@
-// Copyright (c) 2011, Google Inc.
-// All rights reserved.
+// Copyright 2011 Google LLC
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -11,7 +10,7 @@
 // copyright notice, this list of conditions and the following disclaimer
 // in the documentation and/or other materials provided with the
 // distribution.
-//     * Neither the name of Google Inc. nor the names of its
+//     * Neither the name of Google LLC nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
 //
@@ -28,6 +27,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // elf_core_dump_unittest.cc: Unit tests for google_breakpad::ElfCoreDump.
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>  // Must come first
+#endif
 
 #include <sys/procfs.h>
 
@@ -130,9 +133,13 @@ TEST(ElfCoreDumpTest, TestElfHeader) {
 TEST(ElfCoreDumpTest, ValidCoreFile) {
   CrashGenerator crash_generator;
   if (!crash_generator.HasDefaultCorePattern()) {
-    fprintf(stderr, "ElfCoreDumpTest.ValidCoreFile test is skipped "
-            "due to non-default core pattern");
-    return;
+    GTEST_SKIP() << "ElfCoreDumpTest.ValidCoreFile test is skipped "
+                    "due to non-default core pattern";
+  }
+
+  if (!crash_generator.HasResourceLimitsAmenableToCrashCollection()) {
+    GTEST_SKIP() << "ElfCoreDumpTest.ValidCoreFile test is skipped "
+                    "due to inadequate system resource limits";
   }
 
   const unsigned kNumOfThreads = 3;

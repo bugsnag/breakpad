@@ -1,5 +1,4 @@
-// Copyright (c) 2013, Google Inc.
-// All rights reserved.
+// Copyright 2013 Google LLC
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -11,7 +10,7 @@
 // copyright notice, this list of conditions and the following disclaimer
 // in the documentation and/or other materials provided with the
 // distribution.
-//     * Neither the name of Google Inc. nor the names of its
+//     * Neither the name of Google LLC nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
 //
@@ -31,6 +30,10 @@
 
 // stackwalker_mips64_unittest.cc: Unit tests for StackwalkerMIPS class for
 // mips64 platforms.
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>  // Must come first
+#endif
 
 #include <string.h>
 #include <string>
@@ -645,8 +648,10 @@ struct CFIFixture: public StackwalkerMIPSFixture {
     EXPECT_EQ(0x00405000U, frame1->function_base);
   }
 
-  // The values we expect to find for the caller's registers.
-  MDRawContextMIPS expected;
+  // The values we expect to find for the caller's registers. Forcibly
+  // default-init it, since it's POD and not all bits are always overwritten by
+  // the constructor.
+  MDRawContextMIPS expected{};
 
   // The validity mask for expected.
   int expected_validity;

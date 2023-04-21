@@ -1,7 +1,6 @@
 // -*- mode: c++ -*-
 
-// Copyright (c) 2011, Google Inc.
-// All rights reserved.
+// Copyright 2011 Google LLC
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -13,7 +12,7 @@
 // copyright notice, this list of conditions and the following disclaimer
 // in the documentation and/or other materials provided with the
 // distribution.
-//     * Neither the name of Google Inc. nor the names of its
+//     * Neither the name of Google LLC nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
 //
@@ -32,11 +31,17 @@
 // dump_syms_tool.cc: Command line tool that uses the DumpSymbols class.
 // TODO(waylonis): accept stdin
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>  // Must come first
+#endif
+
 #include <mach-o/arch.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <iostream>
+#include <memory>
+#include <utility>
 #include <vector>
 
 #include "common/mac/dump_syms.h"
@@ -51,15 +56,25 @@ using std::vector;
 
 struct Options {
   Options()
-      : srcPath(), dsymPath(), arch(), header_only(false),
-        cfi(true), handle_inter_cu_refs(true) {}
+      : srcPath(),
+        dsymPath(),
+        arch(),
+        header_only(false),
+        cfi(true),
+        handle_inter_cu_refs(true),
+        handle_inlines(false),
+        enable_multiple(false),
+        module_name() {}
 
   string srcPath;
   string dsymPath;
-  const NXArchInfo *arch;
+  std::optional<ArchInfo> arch;
   bool header_only;
   bool cfi;
   bool handle_inter_cu_refs;
+  bool handle_inlines;
+  bool enable_multiple;
+  string module_name;
 };
 
 static bool StackFrameEntryComparator(const Module::StackFrameEntry* a,
@@ -101,14 +116,42 @@ static void CopyCFIDataBetweenModules(Module* to_module,
     // If the entry does not overlap, then it is safe to copy to |to_module|.
     if (to_it == to_data.end() || (from_entry->address < (*to_it)->address &&
             from_entry_end < (*to_it)->address)) {
-      to_module->AddStackFrameEntry(new Module::StackFrameEntry(*from_entry));
+      to_module->AddStackFrameEntry(
+          std::make_unique<Module::StackFrameEntry>(*from_entry));
     }
   }
 }
 
+static bool SetArchitecture(DumpSymbols& dump_symbols,
+                            const ArchInfo& arch,
+                            const std::string& filename) {
+  if (!dump_symbols.SetArchitecture(arch)) {
+    fprintf(stderr, "%s: no architecture '%s' is present in file.\n",
+            filename.c_str(),
+            GetNameFromCPUType(arch.cputype, arch.cpusubtype));
+    size_t available_size;
+    const SuperFatArch* available =
+        dump_symbols.AvailableArchitectures(&available_size);
+    if (available_size == 1)
+      fprintf(stderr, "the file's architecture is: ");
+    else
+      fprintf(stderr, "architectures present in the file are:\n");
+    for (size_t i = 0; i < available_size; i++) {
+      const SuperFatArch* arch = &available[i];
+      fprintf(stderr, "%s\n",
+              GetNameFromCPUType(arch->cputype, arch->cpusubtype));
+    }
+    return false;
+  }
+  return true;
+}
+
 static bool Start(const Options& options) {
-  SymbolData symbol_data = options.cfi ? ALL_SYMBOL_DATA : NO_CFI;
-  DumpSymbols dump_symbols(symbol_data, options.handle_inter_cu_refs);
+  SymbolData symbol_data =
+      (options.handle_inlines ? INLINES : NO_DATA) |
+      (options.cfi ? CFI : NO_DATA) | SYMBOLS_AND_FILES;
+  DumpSymbols dump_symbols(symbol_data, options.handle_inter_cu_refs,
+                           options.enable_multiple, options.module_name);
 
   // For x86_64 binaries, the CFI data is in the __TEXT,__eh_frame of the
   // Mach-O file, which is not copied into the dSYM. Whereas in i386, the CFI
@@ -126,31 +169,9 @@ static bool Start(const Options& options) {
   if (!dump_symbols.Read(primary_file))
     return false;
 
-  if (options.arch) {
-    if (!dump_symbols.SetArchitecture(options.arch->cputype,
-                                      options.arch->cpusubtype)) {
-      fprintf(stderr, "%s: no architecture '%s' is present in file.\n",
-              primary_file.c_str(), options.arch->name);
-      size_t available_size;
-      const SuperFatArch *available =
-        dump_symbols.AvailableArchitectures(&available_size);
-      if (available_size == 1)
-        fprintf(stderr, "the file's architecture is: ");
-      else
-        fprintf(stderr, "architectures present in the file are:\n");
-      for (size_t i = 0; i < available_size; i++) {
-        const SuperFatArch *arch = &available[i];
-        const NXArchInfo *arch_info =
-          google_breakpad::BreakpadGetArchInfoFromCpuType(
-              arch->cputype, arch->cpusubtype);
-        if (arch_info)
-          fprintf(stderr, "%s (%s)\n", arch_info->name, arch_info->description);
-        else
-          fprintf(stderr, "unrecognized cpu type 0x%x, subtype 0x%x\n",
-                  arch->cputype, arch->cpusubtype);
-      }
-      return false;
-    }
+  if (options.arch &&
+      !SetArchitecture(dump_symbols, *options.arch, primary_file)) {
+    return false;
   }
 
   if (options.header_only)
@@ -168,18 +189,47 @@ static bool Start(const Options& options) {
     if (!dump_symbols.Read(options.srcPath))
       return false;
 
+    if (options.arch &&
+        !SetArchitecture(dump_symbols, *options.arch, options.srcPath)) {
+      return false;
+    }
     Module* cfi_module = NULL;
     if (!dump_symbols.ReadSymbolData(&cfi_module))
       return false;
     scoped_ptr<Module> scoped_cfi_module(cfi_module);
 
+    bool name_matches;
+    if (!options.module_name.empty()) {
+      // Ignore the basename of the dSYM and binary and use the passed-in module
+      // name.
+      name_matches = true;
+    } else {
+      name_matches = cfi_module->name() == module->name();
+    }
+
     // Ensure that the modules are for the same debug code file.
-    if (cfi_module->name() != module->name() ||
-        cfi_module->os() != module->os() ||
+    if (!name_matches || cfi_module->os() != module->os() ||
         cfi_module->architecture() != module->architecture() ||
         cfi_module->identifier() != module->identifier()) {
       fprintf(stderr, "Cannot generate a symbol file from split sources that do"
                       " not match.\n");
+      if (!name_matches) {
+        fprintf(stderr, "Name mismatch: binary=[%s], dSYM=[%s]\n",
+                cfi_module->name().c_str(), module->name().c_str());
+      }
+      if (cfi_module->os() != module->os()) {
+        fprintf(stderr, "OS mismatch: binary=[%s], dSYM=[%s]\n",
+                cfi_module->os().c_str(), module->os().c_str());
+      }
+      if (cfi_module->architecture() != module->architecture()) {
+        fprintf(stderr, "Architecture mismatch: binary=[%s], dSYM=[%s]\n",
+                cfi_module->architecture().c_str(),
+                module->architecture().c_str());
+      }
+      if (cfi_module->identifier() != module->identifier()) {
+        fprintf(stderr, "Identifier mismatch: binary=[%s], dSYM=[%s]\n",
+                cfi_module->identifier().c_str(), module->identifier().c_str());
+      }
       return false;
     }
 
@@ -192,8 +242,10 @@ static bool Start(const Options& options) {
 //=============================================================================
 static void Usage(int argc, const char *argv[]) {
   fprintf(stderr, "Output a Breakpad symbol file from a Mach-o file.\n");
-  fprintf(stderr, "Usage: %s [-a ARCHITECTURE] [-c] [-g dSYM path] "
-                  "<Mach-o file>\n", argv[0]);
+  fprintf(stderr,
+          "Usage: %s [-a ARCHITECTURE] [-c] [-g dSYM path] "
+          "[-n MODULE] <Mach-o file>\n",
+          argv[0]);
   fprintf(stderr, "\t-i: Output module header information only.\n");
   fprintf(stderr, "\t-a: Architecture type [default: native, or whatever is\n");
   fprintf(stderr, "\t    in the file, if it contains only one architecture]\n");
@@ -201,6 +253,13 @@ static void Usage(int argc, const char *argv[]) {
                   "Mach-o file\n");
   fprintf(stderr, "\t-c: Do not generate CFI section\n");
   fprintf(stderr, "\t-r: Do not handle inter-compilation unit references\n");
+  fprintf(stderr, "\t-d: Generate INLINE and INLINE_ORIGIN records\n");
+  fprintf(stderr,
+          "\t-m: Enable writing the optional 'm' field on FUNC "
+          "and PUBLIC, denoting multiple symbols for the address.\n");
+  fprintf(stderr,
+          "\t-n: Use MODULE as the name of the module rather than \n"
+          "the basename of the Mach-O file/dSYM.\n");
   fprintf(stderr, "\t-h: Usage\n");
   fprintf(stderr, "\t-?: Usage\n");
 }
@@ -210,14 +269,13 @@ static void SetupOptions(int argc, const char *argv[], Options *options) {
   extern int optind;
   signed char ch;
 
-  while ((ch = getopt(argc, (char * const*)argv, "ia:g:chr?")) != -1) {
+  while ((ch = getopt(argc, (char* const*)argv, "ia:g:crdm?hn:")) != -1) {
     switch (ch) {
       case 'i':
         options->header_only = true;
         break;
       case 'a': {
-        const NXArchInfo *arch_info =
-            google_breakpad::BreakpadGetArchInfoFromName(optarg);
+        std::optional<ArchInfo> arch_info = GetArchInfoFromName(optarg);
         if (!arch_info) {
           fprintf(stderr, "%s: Invalid architecture: %s\n", argv[0], optarg);
           Usage(argc, argv);
@@ -234,6 +292,15 @@ static void SetupOptions(int argc, const char *argv[], Options *options) {
         break;
       case 'r':
         options->handle_inter_cu_refs = false;
+        break;
+      case 'd':
+        options->handle_inlines = true;
+        break;
+      case 'm':
+        options->enable_multiple = true;
+        break;
+      case 'n':
+        options->module_name = optarg;
         break;
       case '?':
       case 'h':
