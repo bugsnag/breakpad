@@ -13,6 +13,11 @@
 
 #include "libdis.h"
 
+#ifdef _MSC_VER
+        #define snprintf        _snprintf
+        #define inline          __inline
+#endif
+
 extern ia32_table_desc_t ia32_tables[];
 extern ia32_settings_t ia32_settings;
 
