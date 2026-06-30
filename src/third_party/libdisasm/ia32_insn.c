@@ -13,6 +13,11 @@
 
 #include "libdis.h"
 
+#ifdef _MSC_VER
+	#define snprintf	_snprintf
+	#define inline		__inline
+#endif
+
 extern ia32_table_desc_t ia32_tables[];
 extern ia32_settings_t ia32_settings;
 
@@ -221,18 +226,24 @@ static void ia32_handle_prefix( x86_insn_t *insn, unsigned int prefixes ) {
                 insn->prefix = insn_no_prefix;
         }
 
-        /* concat all prefix strings */
+        /* concat all prefix strings
+         * SECURITY: replaced unsafe strncat (CWE-119/CWE-788) with snprintf.
+         * snprintf(dst+off, rem, ...) writes at most rem-1 chars + NUL, so it
+         * can never overflow prefix_string[MAX_PREFIX_STR], even when rem==0. */
         if ( (unsigned int)insn->prefix & PREFIX_LOCK ) {
-                strncat(insn->prefix_string, "lock ", 32 - 
-				strlen(insn->prefix_string));
+                size_t lock_off = strlen(insn->prefix_string);
+                snprintf(insn->prefix_string + lock_off,
+                         MAX_PREFIX_STR - lock_off, "lock ");
         }
 
         if ( (unsigned int)insn->prefix & PREFIX_REPNZ ) {
-                strncat(insn->prefix_string, "repnz ", 32  - 
-				strlen(insn->prefix_string));
+                size_t repnz_off = strlen(insn->prefix_string);
+                snprintf(insn->prefix_string + repnz_off,
+                         MAX_PREFIX_STR - repnz_off, "repnz ");
         } else if ( (unsigned int)insn->prefix & PREFIX_REPZ ) {
-                strncat(insn->prefix_string, "repz ", 32 - 
-				strlen(insn->prefix_string));
+                size_t repz_off = strlen(insn->prefix_string);
+                snprintf(insn->prefix_string + repz_off,
+                         MAX_PREFIX_STR - repz_off, "repz ");
         }
 
         return;
