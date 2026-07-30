@@ -15,6 +15,9 @@ on:
   # Allow for manual triggers from the web.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   autotools:
     strategy:
