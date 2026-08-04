@@ -16,6 +16,9 @@ on:
   # Allow for manual triggers from the web.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   coverity:
     runs-on: ubuntu-latest
