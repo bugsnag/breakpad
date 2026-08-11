@@ -32,7 +32,7 @@ namespace google_breakpad {
         &response,
         &response_code)) {
       wprintf(L"Failed to create upload url.\n");
-      wprintf(L"Response code: %ld\n", response_code);
+      wprintf(L"Response code: %d\n", response_code);
       wprintf(L"Response:\n");
       wprintf(L"%s\n", response.c_str());
       return false;
@@ -111,7 +111,7 @@ namespace google_breakpad {
         &response,
         &response_code)) {
       wprintf(L"Failed to complete upload.\n");
-      wprintf(L"Response code: %ld\n", response_code);
+      wprintf(L"Response code: %d\n", response_code);
       wprintf(L"Response:\n");
       wprintf(L"%s\n", response.c_str());
       return CompleteUploadResult::Error;
@@ -154,7 +154,7 @@ namespace google_breakpad {
         &response,
         &response_code)) {
       wprintf(L"Failed to check symbol status.\n");
-      wprintf(L"Response code: %ld\n", response_code);
+      wprintf(L"Response code: %d\n", response_code);
       wprintf(L"Response:\n");
       wprintf(L"%s\n", response.c_str());
       return SymbolStatus::Unknown;

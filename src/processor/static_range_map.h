@@ -88,7 +88,7 @@ class StaticRangeMap {
       return *(reinterpret_cast<const AddressType*>(this));
     }
     const EntryType* entryptr() const {
-      return reinterpret_cast<const EntryType*>(this + sizeof(AddressType));
+      return reinterpret_cast<const EntryType*>(reinterpret_cast<const char*>(this) + sizeof(AddressType));
     }
   };
 
