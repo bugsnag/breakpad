@@ -41,6 +41,7 @@ jobs:
 
     - uses: vapier/coverity-scan-action@v1
       with:
+        project: bugsnag-breakpad
         command: make -C src -O -j$(getconf _NPROCESSORS_CONF)
         email: ${{ secrets.COVERITY_SCAN_EMAIL }}
         token: ${{ secrets.COVERITY_SCAN_TOKEN }}
