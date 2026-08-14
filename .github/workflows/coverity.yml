@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   coverity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       CC: clang
       CXX: clang++
@@ -41,6 +41,7 @@ jobs:
 
     - uses: vapier/coverity-scan-action@v1
       with:
+        project: "Bugsnag breakpad"
         command: make -C src -O -j$(getconf _NPROCESSORS_CONF)
         email: ${{ secrets.COVERITY_SCAN_EMAIL }}
         token: ${{ secrets.COVERITY_SCAN_TOKEN }}
